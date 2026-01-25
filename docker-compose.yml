@@ -1,0 +1,14 @@
+# Notion Financial Dashboard Updater
+# Usage: docker compose up -d --build
+
+services:
+  notion-updater:
+    build: .
+    container_name: notion-updater
+    restart: unless-stopped # Auto-restart on crash or system reboot
+    ports:
+      - "${TRIGGER_PORT:-5001}:5001" # Host:Container, default 5001
+    env_file:
+      - .env # Load Notion tokens and config
+    environment:
+      - TZ=${TIMEZONE:-UTC}

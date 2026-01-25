@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Environment files (loaded via docker-compose)
+.env
+
+# Logs
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# OS
+.DS_Store

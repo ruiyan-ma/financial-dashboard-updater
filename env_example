@@ -1,0 +1,14 @@
+# Notion 集成 Token
+INTERNAL_INTEGRATION_TOKEN=your_notion_token
+
+# 资产库 Database ID
+ASSETS_DATABASE_ID=your_assets_db_id
+
+# 汇率库 Database ID
+CURRENCIES_DATABASE_ID=your_currency_db_id
+
+# (可选) 手动触发端口，默认 5001
+TRIGGER_PORT=5001
+
+# 时区设置 (例如 Asia/Shanghai)
+TIMEZONE=Asia/Shanghai

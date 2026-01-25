@@ -1,0 +1,228 @@
+/* =========================================
+   1. Theme Variables
+   ========================================= */
+:root {
+    /* Color Palette */
+    --bg-color: #F7F7F5;
+    /* Notion Off-White */
+    --card-bg: #FFFFFF;
+    --text-color: #37352F;
+    /* Notion Dark Gray */
+    --secondary-text: #9B9A97;
+    /* Notion Light Gray */
+
+    --accent-color: #2EAADC;
+    /* Notion Blue */
+    --accent-hover: #1F8CB8;
+
+    --error-color: #EB5757;
+    --success-color: #27AE60;
+    --border-color: #E6E6E6;
+
+    /* Typography */
+    --font-stack: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+/* =========================================
+   2. Base Layout
+   ========================================= */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--font-stack);
+    margin: 0;
+    padding: 0;
+
+    /* Center card vertically and horizontally */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    width: 100%;
+    max-width: 600px;
+    /* Constrain width for readability */
+    padding: 2rem;
+    box-sizing: border-box;
+}
+
+.title {
+    font-weight: 700;
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+    text-align: center;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+    /* Prevent ugly wrapping */
+}
+
+/* Mobile Adjustment */
+@media (max-width: 600px) {
+    .title {
+        font-size: 1.5rem;
+    }
+}
+
+/* =========================================
+   3. Status Card Component
+   ========================================= */
+.status-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    /* Subtle shadow for depth */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    margin-bottom: 1.5rem;
+}
+
+.status-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.8rem;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.phase {
+    color: var(--text-color);
+}
+
+.percent {
+    color: var(--secondary-text);
+}
+
+/* Progress Bar Track */
+.progress-bar-container {
+    width: 100%;
+    height: 12px;
+    background-color: #F2F2F2;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+/* Progress Bar Fill */
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    /* JS updates this */
+    background-color: var(--accent-color);
+    transition: width 0.3s ease;
+    /* Smooth animation */
+    border-radius: 6px;
+}
+
+.status-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    min-height: 1.2em;
+    /* Prevent layout jump */
+}
+
+.status-message {
+    color: var(--secondary-text);
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* Ticker Text (e.g. Updated AAPL) */
+.last-item {
+    color: var(--secondary-text);
+    font-size: 1rem;
+    font-family: 'SF Mono', 'Roboto Mono', monospace;
+    /* Monospace for stability */
+    font-weight: 500;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 50%;
+}
+
+/* =========================================
+   4. Error Table Component
+   ========================================= */
+.error-container {
+    margin-bottom: 1.5rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.error-container.hidden {
+    display: none;
+}
+
+.error-container h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--error-color);
+    font-size: 1rem;
+}
+
+.error-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.error-table th,
+.error-table td {
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    text-align: left;
+    color: var(--text-color);
+}
+
+.error-table th {
+    background-color: rgba(0, 0, 0, 0.02);
+    font-weight: 600;
+}
+
+/* =========================================
+   5. Buttons & Utilities
+   ========================================= */
+.actions {
+    width: 100%;
+}
+
+.btn {
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-family: var(--font-stack);
+    width: 100%;
+    display: block;
+    text-align: center;
+}
+
+.btn:hover {
+    background-color: var(--accent-hover);
+}
+
+.btn:disabled {
+    background-color: var(--secondary-text);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Utility Classes */
+.text-success {
+    color: var(--success-color) !important;
+}
+
+.text-error {
+    color: var(--error-color) !important;
+}
