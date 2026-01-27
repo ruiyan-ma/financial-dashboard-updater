@@ -1,7 +1,6 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
 .venv/
 .env
 
@@ -9,6 +8,8 @@ __pycache__/
 .vscode/
 .idea/
 .gemini/
+*.swp
+*.swo
 
 # OS
 .DS_Store

@@ -1,11 +1,23 @@
-# Notion 集成 Token
+# Notion Intenal Token
 INTERNAL_INTEGRATION_TOKEN=your_notion_token
 
-# 资产库 Database ID
+# Assets Database ID
 ASSETS_DATABASE_ID=your_assets_db_id
 
-# 汇率库 Database ID
+# Currencies Database ID
 CURRENCIES_DATABASE_ID=your_currency_db_id
+
+# Income&Expense Database ID
+INC_EXP_DATABASE_ID=your_income_expense_db_id
+
+# Categories Database ID
+CATEGORIES_DATABASE_ID=your_categories_db_id
+
+# Accounts Database ID
+ACCOUNTS_DATABASE_ID=your_accounts_db_id
+
+# Google Gemini API Key
+GEMINI_API_KEY=your_gemini_api_key
 
 # (可选) 手动触发端口，默认 5001
 TRIGGER_PORT=5001
