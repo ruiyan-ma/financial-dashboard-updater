@@ -4,7 +4,7 @@ import threading
 import logging
 import traceback
 import schedule
-from backend.services.common import Colors, setup_logging
+from backend.services.utils import Colors, setup_logging
 from backend.core.logic import run_all_updates, config
 from backend.app import start_web_server
 

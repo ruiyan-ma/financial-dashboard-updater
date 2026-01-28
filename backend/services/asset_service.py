@@ -1,4 +1,4 @@
-from backend.services.common import fetch_price, run_parallel_update
+from backend.services.utils import fetch_price, run_parallel_update
 
 
 def format_ticker(ticker, market=None):
@@ -35,8 +35,6 @@ def process_asset(page):
     return ticker, {"Price": {"number": float(price)}}
 
 
-def update_assets(notion_token, database_id, update_state):
+def update_assets(client, database_id, update_state):
     """Main entry point for asset updates."""
-    run_parallel_update(
-        notion_token, database_id, process_asset, update_state, "Assets"
-    )
+    run_parallel_update(client, database_id, process_asset, update_state, "Assets")

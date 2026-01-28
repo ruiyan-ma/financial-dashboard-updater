@@ -1,4 +1,4 @@
-from backend.services.common import fetch_price, run_parallel_update
+from backend.services.utils import fetch_price, run_parallel_update, get_title
 
 TROY_OUNCE_TO_GRAMS = 31.1034768
 
@@ -53,17 +53,17 @@ def process_currency(page):
     props = page["properties"]
 
     # Extract Name (Title)
-    name_data = props.get("Name", {}).get("title", [])
-    code = name_data[0]["plain_text"].strip().upper() if name_data else ""
+    code = get_title(props)
     if not code:
         raise Exception("Currency code is empty!")
 
+    code = code.strip().upper()
     updated_props = calculate_rates(code, props)
     return code, updated_props
 
 
-def update_currencies(notion_token, database_id, update_state):
+def update_currencies(client, database_id, update_state):
     """Main entry for currency updates."""
     run_parallel_update(
-        notion_token, database_id, process_currency, update_state, "Currencies"
+        client, database_id, process_currency, update_state, "Currencies"
     )

@@ -4,60 +4,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notion Financial Updater</title>
-    <!-- Main Stylesheet -->
+    <title>Transaction Tracker - Notion</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 
-<body>
+<body id="transaction-view">
     <div class="container">
-        <!-- Page Title -->
-        <h1 class="title">Financial Dashboard Updating...</h1>
+        <!-- Header -->
+        <div class="header compact">
+            <h1 class="title">💰 Transaction Tracker</h1>
+            <p class="subtitle large">Extract transaction details from screenshots and sync to Notion.</p>
+        </div>
 
-        <!-- 1. Main Status Card -->
-        <div class="status-card">
-            <!-- Header: "Updating Assets... 45%" -->
-            <div class="status-header">
-                <span id="phase-text" class="phase">Idle</span>
-                <span id="percent-text" class="percent">0%</span>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="progress-bar-container">
-                <div id="progress-bar" class="progress-bar"></div>
-            </div>
-
-            <!-- Footer: "Processed 5/10" & Ticker -->
-            <div class="status-footer">
-                <div id="status-message" class="status-message">Ready to update.</div>
-                <!-- Dynamic Ticker: "Updated AAPL" -->
-                <div id="last-item" class="last-item"></div>
+        <!-- Upload Zone -->
+        <div id="upload-zone" class="upload-zone">
+            <input type="file" id="file-input" accept="image/*" capture="environment" hidden>
+            <div class="upload-content">
+                <div class="upload-icon">📤</div>
+                <div class="upload-text">
+                    <p class="upload-primary">
+                        <!-- Click or drag to upload transaction screenshot -->
+                        Drop screenshots here or click to upload
+                    </p>
+                    <p class="upload-secondary">Supports JPG and PNG formats</p>
+                </div>
             </div>
         </div>
 
-        <!-- 2. Error Report (Hidden by default) -->
-        <div id="error-container" class="error-container hidden">
-            <h3>Errors:</h3>
-            <table class="error-table">
-                <thead>
-                    <tr>
-                        <th style="width: 30%">Item</th>
-                        <th>Error Details</th>
-                    </tr>
-                </thead>
-                <tbody id="error-body">
-                    <!-- Rows injected by JS -->
-                </tbody>
-            </table>
+        <!-- Processing State -->
+        <div id="processing" class="processing hidden">
+            <div class="spinner"></div>
+            <p id="processing-text" class="processing-text">AI analyzing...</p>
         </div>
 
-        <!-- 3. Trigger Button -->
-        <div class="actions">
-            <button id="update-btn" class="btn">Update Now</button>
+        <!-- Results (Editable) -->
+        <div id="results" class="results hidden">
+            <h2 class="results-title">😼 Extraction Successful</h2>
+            <p class="results-hint large">Please confirm or edit the information below:</p>
+
+
+            <div class="results-grid">
+                <div class="result-item">
+                    <label class="result-label">Merchant</label>
+                    <input type="text" id="input-merchant" class="result-input" placeholder="Merchant name">
+                </div>
+                <div class="result-item">
+                    <label class="result-label">Amount</label>
+                    <input type="number" id="input-amount" class="result-input" placeholder="0.00" step="0.01">
+                </div>
+                <div class="result-item">
+                    <label class="result-label">Category</label>
+                    <select id="input-category" class="result-input">
+                        <option value="">Select category</option>
+                    </select>
+                </div>
+                <div class="result-item">
+                    <label class="result-label">Account</label>
+                    <select id="input-account" class="result-input">
+                        <option value="">Select account</option>
+                    </select>
+                </div>
+                <div class="result-item">
+                    <label class="result-label">Date</label>
+                    <input type="date" id="input-date" class="result-input">
+                </div>
+            </div>
+
+            <div class="results-actions">
+                <button id="cancel" class="results-btn">❌ Cancel</button>
+                <button id="confirm-btn" class="results-btn">✅ Confirm</button>
+            </div>
+        </div>
+
+        <!-- Success State -->
+        <div id="success" class="success hidden">
+            <div class="success-icon">🎉</div>
+            <h2 class="success-title">Created Successfully!</h2>
+            <div class="success-actions">
+                <a id="notion-link" href="#" target="_blank" class="success-btn">
+                    📝 View in Notion
+                </a>
+                <button id="back-to-home" class="success-btn">⬅️ Back to Home</button>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="error hidden">
+            <div class="error-icon">⚠️</div>
+            <p id="error-message" class="error-message">Processing failed</p>
+            <button id="retry-btn" class="secondary-btn">Retry</button>
+        </div>
+
+        <!-- Back to Home -->
+        <div id="main-footer" class="footer">
+            <a href="/updater" class="btn btn-secondary">➡️ Dashboard Updater</a>
         </div>
     </div>
 
-    <!-- Application Logic -->
     <script src="/static/js/app.js"></script>
 </body>
 

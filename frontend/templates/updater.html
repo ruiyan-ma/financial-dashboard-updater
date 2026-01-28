@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion Financial Updater</title>
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body id="dashboard-view">
+    <div class="container">
+        <!-- Page Title -->
+        <!-- Page Title -->
+        <div class="header compact">
+            <h1 class="title">🏦 Dashboard Updater</h1>
+            <p class="subtitle large">
+                Update asset prices and currency exchange rates in Notion.
+            </p>
+        </div>
+
+        <!-- 1. Main Status Card -->
+        <div class="status-card">
+            <!-- Header: "Updating Assets... 45%" -->
+            <div class="status-header">
+                <span id="phase-text" class="phase">Idle</span>
+                <span id="percent-text" class="percent">0%</span>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="progress-bar-container">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+
+            <!-- Footer: "Processed 5/10" & Ticker -->
+            <div class="status-footer">
+                <div id="status-message" class="status-message">Ready to update.</div>
+                <!-- Dynamic Ticker: "Updated AAPL" -->
+                <div id="last-item" class="last-item"></div>
+            </div>
+        </div>
+
+        <!-- 2. Error Report (Hidden by default) -->
+        <div id="error-container" class="error-container hidden">
+            <h3>Errors:</h3>
+            <table class="error-table">
+                <thead>
+                    <tr>
+                        <th style="width: 30%">Item</th>
+                        <th>Error Details</th>
+                    </tr>
+                </thead>
+                <tbody id="error-body">
+                    <!-- Rows injected by JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 3. Trigger Button -->
+        <div class="actions">
+            <button id="update-btn" class="btn btn-secondary">🔄 Update Now</button>
+            <a href="/" class="btn btn-secondary">⬅️ Transaction Tracker</a>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>

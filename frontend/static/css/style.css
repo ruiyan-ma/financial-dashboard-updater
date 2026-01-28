@@ -1,79 +1,180 @@
-/* =========================================
-   1. Theme Variables
-   ========================================= */
+/* ==========================================================================
+   1. Theme Variables & Base Configuration
+   ========================================================================== */
 :root {
-    /* Color Palette */
+    /* Backgrounds */
     --bg-color: #F7F7F5;
-    /* Notion Off-White */
-    --card-bg: #FFFFFF;
-    --text-color: #37352F;
-    /* Notion Dark Gray */
-    --secondary-text: #9B9A97;
-    /* Notion Light Gray */
-
-    --accent-color: #2EAADC;
-    /* Notion Blue */
-    --accent-hover: #1F8CB8;
-
-    --error-color: #EB5757;
-    --success-color: #27AE60;
-    --border-color: #E6E6E6;
+    /* Global Page Background */
+    --bg-primary: #ffffff;
+    /* Card/Container Background */
+    --bg-secondary: #f7f6f3;
+    /* Input Backgrounds */
+    --bg-hover: #f1f0ed;
+    /* Hover States */
 
     /* Typography */
+    --text-primary: #37352f;
+    --text-secondary: #787774;
     --font-stack: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+
+    /* Theme Colors */
+    --accent-color: #2EAADC;
+    /* Primary Brand Blue */
+    --accent-hover: #1F8CB8;
+    --success-color: #0f7b6c;
+    /* Notion Green */
+    --error-color: #eb5757;
+    /* Notion Red */
+
+    /* Borders & Shadows */
+    --border-color: #E6E6E6;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* =========================================
-   2. Base Layout
-   ========================================= */
-body {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    font-family: var(--font-stack);
+/* --- Base Layout --- */
+* {
     margin: 0;
     padding: 0;
+    box-sizing: border-box;
+}
 
-    /* Center card vertically and horizontally */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: var(--font-stack);
+    margin: 0;
+    padding: 20px;
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    line-height: 1.6;
 }
 
+/* Centered Container (Max Width 600px Standard) */
 .container {
     width: 100%;
     max-width: 600px;
-    /* Constrain width for readability */
-    padding: 2rem;
-    box-sizing: border-box;
+    /* Standard width for both apps */
+    padding: 0;
+    margin: 0 auto;
 }
 
+/* --- Typography --- */
 .title {
     font-weight: 700;
     font-size: 2.5rem;
     margin-bottom: 2rem;
     text-align: center;
     letter-spacing: -0.02em;
-    white-space: nowrap;
-    /* Prevent ugly wrapping */
+    color: var(--text-primary);
 }
 
-/* Mobile Adjustment */
-@media (max-width: 600px) {
-    .title {
-        font-size: 1.5rem;
-    }
+.subtitle {
+    font-size: 0.95rem;
+    /* Base size */
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: -1.5rem;
+    margin-bottom: 2rem;
 }
 
-/* =========================================
-   3. Status Card Component
-   ========================================= */
+/* --- Shared Components --- */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+    /* Default spacing */
+}
+
+/* Modifier for headers that need tighter spacing (was inline style) */
+.header.compact {
+    margin-bottom: 32px;
+}
+
+/* Subtitle modifier for larger text (was inline style) */
+.subtitle.large {
+    font-size: 1.1rem;
+    margin-bottom: 0;
+}
+
+.footer {
+    text-align: center;
+    margin-top: 32px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* --- Buttons --- */
+.btn,
+.results-btn,
+.success-btn {
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s ease;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    width: 100%;
+    /* Default block behavior in flex containers */
+    flex: 1;
+    /* Grow in flex rows */
+    font-family: inherit;
+}
+
+.btn:hover,
+.results-btn:hover,
+.success-btn:hover {
+    background-color: var(--accent-hover);
+    transform: translateY(-1px);
+}
+
+.btn:active,
+.results-btn:active,
+.success-btn:active {
+    transform: translateY(0);
+}
+
+.btn:disabled {
+    background-color: var(--text-secondary);
+    cursor: not-allowed;
+    opacity: 0.6;
+    transform: none;
+}
+
+/* Secondary Button Variant (White/Outline) */
+.btn-secondary {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background-color: var(--bg-hover);
+    border-color: var(--accent-color);
+}
+
+
+/* ==========================================================================
+   2. Dashboard Updater Styles (#dashboard-view)
+   ========================================================================== */
+#dashboard-view .container {
+    padding: 2rem;
+}
+
 .status-card {
-    background: var(--card-bg);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
-    /* Subtle shadow for depth */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
     margin-bottom: 1.5rem;
 }
@@ -87,14 +188,14 @@ body {
 }
 
 .phase {
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .percent {
-    color: var(--secondary-text);
+    color: var(--text-secondary);
 }
 
-/* Progress Bar Track */
+/* Progress Bar */
 .progress-bar-container {
     width: 100%;
     height: 12px;
@@ -103,14 +204,11 @@ body {
     overflow: hidden;
 }
 
-/* Progress Bar Fill */
 .progress-bar {
     height: 100%;
     width: 0%;
-    /* JS updates this */
     background-color: var(--accent-color);
     transition: width 0.3s ease;
-    /* Smooth animation */
     border-radius: 6px;
 }
 
@@ -120,22 +218,19 @@ body {
     align-items: center;
     margin-top: 1rem;
     min-height: 1.2em;
-    /* Prevent layout jump */
 }
 
 .status-message {
-    color: var(--secondary-text);
+    color: var(--text-secondary);
     font-size: 1rem;
     font-weight: 500;
     margin: 0;
 }
 
-/* Ticker Text (e.g. Updated AAPL) */
 .last-item {
-    color: var(--secondary-text);
+    color: var(--text-secondary);
     font-size: 1rem;
     font-family: 'SF Mono', 'Roboto Mono', monospace;
-    /* Monospace for stability */
     font-weight: 500;
     text-align: right;
     white-space: nowrap;
@@ -144,19 +239,21 @@ body {
     max-width: 50%;
 }
 
-/* =========================================
-   4. Error Table Component
-   ========================================= */
+.text-success {
+    color: var(--success-color);
+}
+
+.text-error {
+    color: var(--error-color);
+}
+
+/* Dashboard Error Table */
 .error-container {
     margin-bottom: 1.5rem;
-    background: var(--card-bg);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1rem;
-}
-
-.error-container.hidden {
-    display: none;
 }
 
 .error-container h3 {
@@ -177,7 +274,7 @@ body {
     border: 1px solid var(--border-color);
     padding: 8px 12px;
     text-align: left;
-    color: var(--text-color);
+    color: var(--text-primary);
 }
 
 .error-table th {
@@ -185,44 +282,274 @@ body {
     font-weight: 600;
 }
 
-/* =========================================
-   5. Buttons & Utilities
-   ========================================= */
 .actions {
     width: 100%;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
 }
 
-.btn {
-    background-color: var(--accent-color);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 6px;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-family: var(--font-stack);
-    width: 100%;
-    display: block;
+
+/* ==========================================================================
+   3. Transaction Tracker Styles (#transaction-view)
+   ========================================================================== */
+
+/* Upload Zone */
+.upload-zone {
+    background: var(--bg-primary);
+    border: 2px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 60px 40px;
     text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow);
 }
 
-.btn:hover {
-    background-color: var(--accent-hover);
+.upload-zone:hover {
+    border-color: var(--accent-color);
+    background: var(--bg-hover);
+    box-shadow: var(--shadow-hover);
 }
 
-.btn:disabled {
-    background-color: var(--secondary-text);
-    cursor: not-allowed;
-    opacity: 0.6;
+.upload-zone.dragover {
+    border-color: var(--accent-color);
+    background: #e8f4fd;
 }
 
-/* Utility Classes */
-.text-success {
-    color: var(--success-color) !important;
+.upload-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
 }
 
-.text-error {
-    color: var(--error-color) !important;
+.upload-primary {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.upload-secondary {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+/* Processing Status */
+.processing {
+    background: var(--bg-primary);
+    border-radius: 12px;
+    padding: 60px 40px;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    margin: 0 auto 20px;
+    border: 4px solid var(--border-color);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.processing-text {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+/* Results Form */
+.results {
+    background: var(--bg-primary);
+    border-radius: 12px;
+    padding: 32px;
+    box-shadow: var(--shadow);
+}
+
+.results-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--success-color);
+}
+
+.results-hint {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+/* Modifier for larger hint text (was inline style) */
+.results-hint.large {
+    font-size: 1.05rem;
+    margin-bottom: 12px;
+}
+
+.results-grid {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.result-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.result-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.result-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.result-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    background: var(--bg-primary);
+    box-shadow: 0 0 0 3px rgba(46, 170, 220, 0.1);
+}
+
+.result-input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.5;
+}
+
+/* Custom Select Dropdown Arrow */
+select.result-input {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23787774' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px 12px;
+    padding-right: 36px;
+    cursor: pointer;
+}
+
+select.result-input:focus {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%232EAADC' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px 12px;
+}
+
+.results-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.results-btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.results-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+}
+
+/* Success Card */
+.success {
+    background: var(--bg-primary);
+    border-radius: 12px;
+    /* Custom vertical alignment padding */
+    padding: 80px 40px 30px 40px;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.success-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+}
+
+.success-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 32px;
+    color: var(--success-color);
+}
+
+.success-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.success-btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.success-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent-color);
+    color: var(--text-primary);
+    /* Ensure explicit coloring */
+}
+
+/* Error Card */
+.error {
+    background: var(--bg-primary);
+    border-radius: 12px;
+    padding: 60px 40px;
+    text-align: center;
+    box-shadow: var(--shadow);
+}
+
+.error-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+}
+
+.error-message {
+    font-size: 1rem;
+    color: var(--error-color);
+    margin-bottom: 20px;
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   4. Media Queries
+   ========================================================================== */
+@media (max-width: 640px) {
+    .title {
+        font-size: 1.5rem;
+    }
+
+    .actions,
+    .success-actions,
+    .results-actions {
+        flex-direction: column;
+    }
+
+    .upload-zone {
+        padding: 40px 24px;
+    }
+
+    .results {
+        padding: 24px;
+    }
 }
