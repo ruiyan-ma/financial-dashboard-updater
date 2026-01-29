@@ -22,7 +22,19 @@ def setup_logging():
     # Silence third-party noise
     logging.getLogger("yfinance").setLevel(logging.CRITICAL)
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("google.genai").setLevel(logging.WARNING)
+    logging.getLogger("google_genai").setLevel(logging.WARNING)
+
+    # Filter out specific messages from loggers
+    class MessageFilter(logging.Filter):
+        def filter(self, record):
+            msg = record.getMessage()
+            # HTTPS/SSL handshake garbage on HTTP port
+            if "code 400, message Bad" in msg:
+                return False
+            return True
+
+    logging.getLogger("werkzeug").addFilter(MessageFilter())
+    logging.getLogger().addFilter(MessageFilter())
 
 
 def get_title(properties):
@@ -64,12 +76,12 @@ def run_parallel_update(client, database_id, process_func, update_state, label):
             # The process_func should return (identifier, new_props) or raise exceptions
             identifier, new_props = process_func(page)
             client.pages.update(page_id=page["id"], properties=new_props)
-            update_state.update_progress(f"✅ Updated {identifier}", "success")
+            update_state.update_progress(f"✅ {identifier}", "success")
             success_count += 1
 
         except Exception as e:
             name = get_title(page["properties"]) or page.get("id")
-            update_state.update_progress(f"❌ Failed on {name}", "error")
+            update_state.update_progress(f"❌ {name}", "error")
             update_state.add_error(name, str(e))
             logging.error(f"Failed on {name}: {e}")
 

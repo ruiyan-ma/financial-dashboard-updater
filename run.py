@@ -12,8 +12,6 @@ from backend.app import start_web_server
 def scheduler_loop():
     # Schedule updates to run every hour at :30
     schedule.every().hour.at(":30").do(run_all_updates)
-    run_all_updates()
-
     while True:
         schedule.run_pending()
         time.sleep(60)  # Check every minute

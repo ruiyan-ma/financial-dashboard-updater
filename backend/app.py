@@ -26,13 +26,13 @@ def updater_page():
     return render_template("updater.html")
 
 
-@app.route("/api/status")
-def status():
+@app.route("/api/updater/status")
+def updater_status():
     return jsonify(global_state.get_snapshot())
 
 
-@app.route("/api/trigger", methods=["POST"])
-def trigger():
+@app.route("/api/updater/trigger", methods=["POST"])
+def updater_trigger():
     if global_state.get_snapshot()["isRunning"]:
         return jsonify({"success": False, "message": "Update already in progress"}), 409
 
@@ -69,7 +69,7 @@ def xact_options():
 @app.route("/api/transaction/upload", methods=["POST"])
 def xact_upload():
     """
-    API endpoint to handle expense image upload and AI extraction.
+    API endpoint to handle transaction image upload and AI extraction.
 
     Request:
         - Content-Type: multipart/form-data
@@ -144,6 +144,81 @@ def xact_confirm():
         notion_url = create_xact_entry(data)
 
         return jsonify({"success": True, "notionUrl": notion_url})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/transaction/shortcut", methods=["POST"])
+def xact_shortcut():
+    """
+    API endpoint for one-step transaction tracking (extraction + page creation).
+
+    Designed for iOS Shortcut automation.
+
+    Request:
+        - Content-Type: multipart/form-data
+        - file: Image file
+
+    Returns:
+        JSON response:
+            - success: bool - Whether extraction succeeded
+            - notionUrl: str - URL of created Notion page (only if success=true)
+            - message: str - Friendly message for Shortcut (only if success=true)
+            - error: str - Error message (only if success=false)
+
+    Status Codes:
+        200: Success
+        400: Bad request (no file or empty filename)
+        422: Unprocessable Entity (AI extraction failed to find amount or date)
+        500: Server error (image processing or AI extraction failed)
+    """
+    try:
+        if "file" not in request.files:
+            return jsonify({"success": False, "error": "No file uploaded"}), 400
+
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"success": False, "error": "Empty filename"}), 400
+
+        # 1. Extract Data: Need to refresh category_map and account_map
+        image_bytes = file.read()
+        extracted_data = get_xact_data_from_img(image_bytes, refresh=True)
+
+        # 2. Check minimal viability (Amount and Date)
+        if not extracted_data.get("amount") or not extracted_data.get("date"):
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "Gemini failed to find amount or date",
+                    }
+                ),
+                422,
+            )
+
+        # 3. Create Entry
+        notion_url = create_xact_entry(extracted_data)
+
+        # 4. Construct friendly message for Shortcut
+        message = (
+            f"🏪 {extracted_data.get('merchant') or 'Unknown'}\n"
+            f"💰 {extracted_data.get('amount') or 0}\n"
+            f"📅 {extracted_data.get('date') or 'Today'}\n"
+            f"🏷️ {extracted_data.get('category') or 'Unknown'}\n"
+            f"💳 {extracted_data.get('account') or 'Unknown'}"
+        )
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "notionUrl": notion_url,
+                    "message": message,
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

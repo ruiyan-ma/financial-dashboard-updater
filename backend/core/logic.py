@@ -101,16 +101,23 @@ def get_cat_and_acct_opts():
     return {"categories": categories, "accounts": accounts}
 
 
-def get_xact_data_from_img(image_bytes):
-    """Extracts transaction data from an image using Gemini AI."""
+def get_xact_data_from_img(image_bytes, refresh=False):
+    """
+    Extracts transaction data from an image using Gemini AI.
+
+    Refreshes category_map and account_map for iOS Shortcut automation.
+    """
     if not xact_service:
         raise RuntimeError("Transaction (Income/Expense) service is not initialized.")
 
+    # 1. Process image
     processed_image = process_image(image_bytes)
 
-    category_map = xact_service.fetch_category_map(config.category_db_id)
-    account_map = xact_service.fetch_account_map(config.account_db_id)
+    # 2. Fetch category_map and account_map
+    category_map = xact_service.fetch_category_map(config.category_db_id, refresh)
+    account_map = xact_service.fetch_account_map(config.account_db_id, refresh)
 
+    # 3. AI Extraction
     extracted_data = extract_xact_data(
         processed_image,
         config.gemini_api_key,

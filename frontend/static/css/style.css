@@ -411,6 +411,9 @@ body {
 
 .result-input {
     width: 100%;
+    /* Ensure padding doesn't increase width */
+    appearance: none;
+    -webkit-appearance: none;
     padding: 12px 16px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);

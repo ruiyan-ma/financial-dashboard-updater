@@ -15,7 +15,7 @@ Notion Financial Dashboard 自动化工具：用于更新资产价格和汇率�
 - **智能识别**：使用 Gemini Vision API 自动识别支付截图中的交易信息
 - **自动分类**：根据金额自动判断收入/支出，智能匹配分类
 - **账户识别**：精准识别支付方式（支付宝、微信、银行卡等）
-- **一键记账**：只需提供截图路径，自动创建 Notion 记账条目
+- **iOS 快捷指令**：双击手机背面自动截图记账
 
 ## 快速开始
 
@@ -39,9 +39,9 @@ docker stop notion-updater
 docker restart notion-updater
 ```
 
-程序启动后会立即执行一次更新，随后每隔一小时更新一次
+程序启动后，会在每小时的第 30 分钟自动执行更新操作
 
-若需手动更新，可在浏览器访问：`http://localhost:5001` (或你自定义的端口)
+访问 `http://localhost:5001`（或你自定义的端口）即可手动触发更新，并使用自动记账功能
 
 ### 本地部署
 
@@ -56,12 +56,23 @@ source .venv/bin/activate  # macOS/Linux
 # 安装依赖
 pip install -r requirements.txt
 
-# 启动资产更新服务
+# 启动服务
 python run.py
-
-# 或使用 AI 自动记账
-python auto_expense.py /path/to/screenshot.png
 ```
+
+### iOS 快捷指令
+
+**[👉 点击安装 “Notion Updater” 快捷指令](https://www.icloud.com/shortcuts/aba1bdb6b07f4890b188f514b4be4149)**
+
+安装完成后，请对快捷指令进行编辑，将 “Get contents of URL” 中的链接替换为你的主机地址
+
+```
+http://<your-machine-ip>:5001/api/transaction/shortcut
+```
+
+打开 “设置” -> “辅助功能” -> “触控” -> “轻点背面” -> “轻点两下”，然后选择 “Notion Updater” 快捷指令
+
+完成上述设置后，就可以通过“双击手机背面”来调取快捷指令，自动完成记账
 
 ### 远程访问
 
@@ -82,16 +93,14 @@ python auto_expense.py /path/to/screenshot.png
 ├── Dockerfile            # Docker 镜像构建配置
 ├── docker-compose.yml    # Docker Compose 编排配置
 ├── requirements.txt      # Python 依赖
-├── run.py                # 资产更新服务启动入口
-├── auto_expense.py       # AI 自动记账脚本
-├── updater.log           # 运行日志（自动生成）
+├── run.py                # 服务启动入口
 ├── backend/              # 后端代码
 │   ├── app.py            # Flask 路由
 │   ├── core/             # 核心引擎
 │   └── services/         # 业务逻辑
 └── frontend/             # 前端界面
-    ├── templates/
-    └── static/
+    ├── templates/        # HTML 模板
+    └── static/           # CSS/JS 资源
 ```
 
 ## 许可证

@@ -61,7 +61,7 @@ class DashboardController {
             this.dom.updateBtn.disabled = true;
             this.dom.updateBtn.textContent = "Requesting...";
 
-            const res = await fetch("/api/trigger", { method: "POST" });
+            const res = await fetch("/api/updater/trigger", { method: "POST" });
             if (!res.ok) {
                 const data = await res.json();
                 alert(data.message);
@@ -82,7 +82,7 @@ class DashboardController {
      */
     async pollStatus() {
         try {
-            const response = await fetch("/api/status");
+            const response = await fetch("/api/updater/status");
             const data = await response.json();
             this.updateUI(data);
 

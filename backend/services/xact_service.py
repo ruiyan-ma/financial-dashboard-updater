@@ -12,7 +12,7 @@ EXPENSE_ICON = "https://www.notion.so/icons/arrow-up_red.svg"
 
 
 class XactService:
-    """Stateful service for income and expense tracking operations."""
+    """Stateful service for transaction (Income/Expense) tracking operations."""
 
     def __init__(self, notion_client):
         """Initialize the service with a Notion Client instance."""
@@ -107,26 +107,26 @@ def extract_xact_data(image_bytes, api_key, category_map, account_map):
 
     # AI Prompt (DO NOT MODIFY - carefully tuned for accuracy)
     prompt = f"""
-Analyze this transaction and return ONLY raw JSON:
+Analyze this image and extract transaction details. Return ONLY raw JSON: 
 {{"merchant": "store/merchant name", "amount": number, "category": "from list", "account": "from list", "date": "YYYY-MM-DD"}}
 
-Rules:
-1. Merchant logic:
-   - WeChat: Use bold text at the top.
-   - Alipay: Use '商品说明' field.
-   - Avoid generic names like '淘宝闪购' if a specific store is visible.
+Extraction Logic:
+- Merchant:
+  - Use bold text at the top, or '商品说明' field.
+  - Avoid generic names like '淘宝闪购' if a specific store is visible.
+- Amount: MUST be positive number without sign (e.g. -41.4 → 41.4)
+- Category:
+  - If the number is POSITIVE, choose from [{income_str}]
+  - If the number is NEGATIVE, choose from: [{expense_str}]
+- Account: Read "支付方式" or "付款方式" field
+  - WeChat keywords: '零钱', '微信支付'
+  - Alipay keywords: '余额', '花呗', '支付宝'
+  - Bank cards: Use the exact bank name if mentioned (e.g. '招商银行信用卡')
+  - MUST choose from: [{account_str}]
 
-2. Amount logic: MUST be positive number without sign (e.g. -41.4 → 41.4, +100 → 100)
-
-3. Category logic:
-   - If the number is POSITIVE (e.g. +100 or 100), this is INCOME, category MUST be from [{income_str}]
-   - If the number is NEGATIVE (e.g. -50), this is EXPENSE, category MUST be from [{expense_str}]
-
-4. Account keywords: Read "支付方式" or "付款方式" field
-   - WeChat keywords: '零钱', '微信零钱'
-   - Alipay keywords: '余额', '账户余额', '花呗'
-   - Bank cards: Use the exact bank name if mentioned (e.g. '招商银行信用卡')
-   - MUST be from: [{account_str}]
+RULES: DO NOT HALLUCINATE
+1. If the image is NOT a receipt/transaction/bill, set all fields to null.
+2. If any specific field (like merchant or amount) is not visible, set that specific field to null. 
 """
 
     res = client.models.generate_content(
