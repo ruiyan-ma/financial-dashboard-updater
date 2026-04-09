@@ -1,3 +1,4 @@
+import math
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from notion_client import Client
@@ -61,7 +62,9 @@ def fetch_price(ticker):
             hist = data.history(period="5d")
             if not hist.empty:
                 price = hist["Close"].iloc[-1]
-        return price
+        if price is not None and math.isfinite(price):
+            return price
+        return None
     except Exception:
         return None
 
