@@ -1,7 +1,8 @@
 import json
 import io
+import base64
 from PIL import Image
-from google.genai import Client, types
+from openai import OpenAI
 from backend.services.utils import get_title
 
 MAX_IMAGE_SIZE = 1024
@@ -88,12 +89,12 @@ def process_image(image_bytes):
         raise ValueError(f"Image processing failed: {e}")
 
 
-def extract_xact_data(image_bytes, api_key, category_map, account_map):
-    """Extracts transaction details from an image using Gemini AI."""
+def extract_xact_data(
+    image_bytes, api_key, base_url, model_name, category_map, account_map
+):
+    """Extracts transaction details from an image using vision LLM."""
     if not api_key:
-        raise ValueError("Gemini API key is missing")
-
-    client = Client(api_key=api_key)
+        raise ValueError("API key is missing")
 
     # Separate categories by income/expense type
     incomes = [name for name, data in category_map.items() if data["type"] == "Income"]
@@ -112,8 +113,8 @@ Analyze this image and extract transaction details. Return ONLY raw JSON:
 
 Extraction Logic:
 - Merchant:
-  - Use bold text at the top, or '商品说明' field.
-  - Avoid generic names like '淘宝闪购' if a specific store is visible.
+  - Check '商品说明' field for specific store name.
+  - Fall back to the bold title text if no specific store name is provided.
 - Amount: MUST be positive number without sign (e.g. -41.4 → 41.4)
 - Category:
   - If the number is POSITIVE, choose from [{income_str}]
@@ -129,16 +130,26 @@ RULES: DO NOT HALLUCINATE
 2. If any specific field (like merchant or amount) is not visible, set that specific field to null. 
 """
 
-    res = client.models.generate_content(
-        model="models/gemini-2.5-flash",
-        contents=[
-            prompt,
-            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    b64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+    res = client.chat.completions.create(
+        model=model_name,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"},
+                    },
+                ],
+            }
         ],
     )
 
-    # Parse JSON response (remove markdown formatting if present)
-    clean_text = res.text.strip(" `\n")
+    clean_text = res.choices[0].message.content.strip(" `\n")
     if clean_text.startswith("json"):
         clean_text = clean_text[4:].strip()
     return json.loads(clean_text)
