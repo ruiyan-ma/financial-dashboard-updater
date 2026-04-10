@@ -26,9 +26,10 @@ class Config:
         self.inc_exp_db_id = os.environ.get("INC_EXP_DATABASE_ID")
         self.category_db_id = os.environ.get("CATEGORIES_DATABASE_ID")
         self.account_db_id = os.environ.get("ACCOUNTS_DATABASE_ID")
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+        self.model_api_key = os.environ.get("MODEL_API_KEY")
+        self.model_base_url = os.environ.get("MODEL_BASE_URL", "https://api.siliconflow.cn/v1")
+        self.model_name = os.environ.get("MODEL_NAME", "zai-org/GLM-4.5V")
         self.port = int(os.environ.get("TRIGGER_PORT", 5001))
-        self.interval = 60 * 60
         self.lock = threading.Lock()  # prevents overlapping cycles
 
 
@@ -103,7 +104,7 @@ def get_cat_and_acct_opts():
 
 def get_xact_data_from_img(image_bytes, refresh=False):
     """
-    Extracts transaction data from an image using Gemini AI.
+    Extracts transaction data from an image using AI.
 
     Refreshes category_map and account_map for iOS Shortcut automation.
     """
@@ -120,7 +121,9 @@ def get_xact_data_from_img(image_bytes, refresh=False):
     # 3. AI Extraction
     extracted_data = extract_xact_data(
         processed_image,
-        config.gemini_api_key,
+        config.model_api_key,
+        config.model_base_url,
+        config.model_name,
         category_map,
         account_map,
     )

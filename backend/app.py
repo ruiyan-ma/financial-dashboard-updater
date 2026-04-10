@@ -191,7 +191,7 @@ def xact_shortcut():
                 jsonify(
                     {
                         "success": False,
-                        "error": "Gemini failed to find amount or date",
+                        "error": "AI model failed to find amount or date",
                     }
                 ),
                 422,

@@ -23,7 +23,7 @@ def setup_logging():
     # Silence third-party noise
     logging.getLogger("yfinance").setLevel(logging.CRITICAL)
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("google_genai").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
 
     # Filter out specific messages from loggers
     class MessageFilter(logging.Filter):

@@ -1,11 +1,13 @@
 import json
 import io
+import base64
 from PIL import Image
-from google.genai import Client, types
+from openai import OpenAI
 from backend.services.utils import get_title
 
 MAX_IMAGE_SIZE = 1024
 JPEG_QUALITY = 85
+MAX_TOKEN = 120
 DEFAULT_ACCOUNT_TYPE = "checking"
 INCOME_ICON = "https://www.notion.so/icons/arrow-down_green.svg"
 EXPENSE_ICON = "https://www.notion.so/icons/arrow-up_red.svg"
@@ -88,12 +90,42 @@ def process_image(image_bytes):
         raise ValueError(f"Image processing failed: {e}")
 
 
-def extract_xact_data(image_bytes, api_key, category_map, account_map):
-    """Extracts transaction details from an image using Gemini AI."""
-    if not api_key:
-        raise ValueError("Gemini API key is missing")
+def _parse_model_json(content):
+    """Parses the JSON object in the model response."""
+    if isinstance(content, list):
+        text = "\n".join(
+            item.get("text") if isinstance(item, dict) else getattr(item, "text", "")
+            for item in content
+        )
+    else:
+        text = str(content or "")
 
-    client = Client(api_key=api_key)
+    text = text.strip()
+    if not text:
+        raise ValueError("Model returned empty response.")
+
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start == -1 or end == -1 or end <= start:
+        preview = text[:200].replace("\n", "\\n")
+        raise ValueError(
+            f"Model did not return a JSON object. Response preview: {preview}"
+        )
+
+    try:
+        return json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        preview = text[:200].replace("\n", "\\n")
+        raise ValueError(f"Model returned invalid JSON. Response preview: {preview}")
+
+
+def extract_xact_data(
+    image_bytes, api_key, base_url, model_name, category_map, account_map
+):
+    """Extracts transaction details from an image using vision LLM."""
+    if not api_key:
+        raise ValueError("API key is missing")
 
     # Separate categories by income/expense type
     incomes = [name for name, data in category_map.items() if data["type"] == "Income"]
@@ -105,43 +137,54 @@ def extract_xact_data(image_bytes, api_key, category_map, account_map):
     expense_str = ", ".join(expenses) if expenses else "N/A"
     account_str = ", ".join(account_map.keys())
 
-    # AI Prompt (DO NOT MODIFY - carefully tuned for accuracy)
     prompt = f"""
-Analyze this image and extract transaction details. Return ONLY raw JSON: 
+Analyze this image and extract transaction details.
+
+Return ONLY raw JSON in this format:
 {{"merchant": "store/merchant name", "amount": number, "category": "from list", "account": "from list", "date": "YYYY-MM-DD"}}
 
-Extraction Logic:
-- Merchant:
-  - Use bold text at the top, or '商品说明' field.
-  - Avoid generic names like '淘宝闪购' if a specific store is visible.
-- Amount: MUST be positive number without sign (e.g. -41.4 → 41.4)
+Field rules:
+- Merchant: select the value from '商品说明' field if available, otherwise use the bold title text.
+- Amount: determine income or expense from the original amount shown in the image, but return the absolute value only.
 - Category:
-  - If the number is POSITIVE, choose from [{income_str}]
-  - If the number is NEGATIVE, choose from: [{expense_str}]
-- Account: Read "支付方式" or "付款方式" field
+  - If the original amount is positive, choose only from [{income_str}]
+  - If the original amount is negative, choose only from [{expense_str}]
+- Account: read '支付方式' or '付款方式'
   - WeChat keywords: '零钱', '微信支付'
   - Alipay keywords: '余额', '花呗', '支付宝'
-  - Bank cards: Use the exact bank name if mentioned (e.g. '招商银行信用卡')
+  - Bank cards: use the exact bank name shown
   - MUST choose from: [{account_str}]
 
-RULES: DO NOT HALLUCINATE
-1. If the image is NOT a receipt/transaction/bill, set all fields to null.
-2. If any specific field (like merchant or amount) is not visible, set that specific field to null. 
+General rules:
+1. If the image is NOT a receipt, transaction, or bill, set all fields to null.
+2. If any specific field is missing or uncertain, set only that field to null.
+3. Return JSON only. No explanation, no markdown, no code fences.
 """
 
-    res = client.models.generate_content(
-        model="models/gemini-2.5-flash",
-        contents=[
-            prompt,
-            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-        ],
-    )
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    b64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-    # Parse JSON response (remove markdown formatting if present)
-    clean_text = res.text.strip(" `\n")
-    if clean_text.startswith("json"):
-        clean_text = clean_text[4:].strip()
-    return json.loads(clean_text)
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"},
+                },
+            ],
+        },
+    ]
+
+    request_kwargs = {
+        "model": model_name,
+        "temperature": 0,
+        "max_tokens": MAX_TOKEN,
+        "messages": messages,
+    }
+    res = client.chat.completions.create(**request_kwargs)
+    return _parse_model_json(res.choices[0].message.content)
 
 
 def create_new_entry(client, db_id, transaction, category_map, account_map):
