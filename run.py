@@ -2,18 +2,23 @@ import time
 import warnings
 import threading
 import logging
-import traceback
 import schedule
 from backend.services.utils import Colors, setup_logging
 from backend.core.logic import run_all_updates, config
 from backend.app import start_web_server
+
+logger = logging.getLogger(__name__)
 
 
 def scheduler_loop():
     # Schedule updates to run every hour at :30
     schedule.every().hour.at(":30").do(run_all_updates)
     while True:
-        schedule.run_pending()
+        try:
+            schedule.run_pending()
+        except Exception:
+            # Don't let the scheduler thread die silently on unexpected errors
+            logger.exception("Failed on scheduler_loop.")
         time.sleep(60)  # Check every minute
 
 
@@ -36,13 +41,9 @@ def main():
     except KeyboardInterrupt:
         print(f"\n{Colors.YELLOW}👋 Shutdown requested. Goodbye!{Colors.ENDC}")
     except Exception as e:
-        # Write full traceback to the file log
-        logging.critical("Application crashed with an unexpected error", exc_info=True)
-
-        # Print detailed error to console
+        logger.critical("Application crashed with an unexpected error", exc_info=True)
         print(f"\n{Colors.RED}❌ ERROR: {str(e)}{Colors.ENDC}")
-        traceback.print_exc()
-        print(f"{Colors.YELLOW}Server exited unexpectedly.{Colors.ENDC}")
+        print(f"{Colors.YELLOW}Server exited unexpectedly. See logs/app.log for details.{Colors.ENDC}")
 
 
 if __name__ == "__main__":

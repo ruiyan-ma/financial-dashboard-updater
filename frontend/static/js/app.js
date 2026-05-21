@@ -155,10 +155,17 @@ class DashboardController {
 
         errors.forEach((err) => {
             const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td style="font-weight: 600;">${err.name}</td>
-                <td>${err.message}</td>
-            `;
+
+            const nameTd = document.createElement("td");
+            nameTd.style.fontWeight = "600";
+            nameTd.textContent = err.name;
+
+            const messageTd = document.createElement("td");
+            messageTd.textContent = err.message;
+
+            tr.appendChild(nameTd);
+            tr.appendChild(messageTd);
+
             this.dom.errorBody.appendChild(tr);
         });
     }
@@ -186,7 +193,7 @@ class TransactionController {
             NO_FILE: "Please upload an image file",
             INVALID_TYPE: "Please upload an image file (JPG, PNG)",
             FILE_TOO_LARGE: "Image size cannot exceed 10MB",
-            MISSING_FIELDS: "Please fill in all required fields",
+            MISSING_FIELDS: "Please fill in amount and date",
             NETWORK_ERROR: "Network error, please check connection and retry",
             EXTRACTION_FAILED: "Extraction failed, please retry",
             CREATION_FAILED: "Creation failed, please retry",
@@ -341,7 +348,7 @@ class TransactionController {
             date: this.dom.inputDate.value,
         };
 
-        if (!data.merchant || !data.amount || !data.category || !data.account) {
+        if (!data.amount || !data.date) {
             this.showError(this.MESSAGES.MISSING_FIELDS);
             return;
         }
