@@ -155,7 +155,7 @@ Field rules:
   - If the original amount is negative, choose only from [{expense_str}]
 - Account: read '支付方式' or '付款方式'
   - WeChat keywords: '零钱', '微信支付'
-  - Alipay keywords: '余额', '花呗', '支付宝'
+  - Alipay keywords: '余额', '花呗', '余额宝'
   - Bank cards: use the exact bank name shown
   - MUST choose from: [{account_str}]
 

@@ -3,8 +3,14 @@ import re
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import curl_cffi.requests
 from notion_client import Client
 import yfinance as yf
+
+# yfinance session that bypasses shell proxy. Must be a curl_cffi session
+# with browser impersonation — yfinance rejects a stdlib requests.Session.
+yf_session = curl_cffi.requests.Session(impersonate="chrome")
+yf_session.trust_env = False
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 LOGS_DIR = PROJECT_ROOT / "logs"
@@ -50,7 +56,7 @@ def setup_logging():
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("openai").setLevel(logging.WARNING)
 
-    # Suppress yfinance "symbol-not-found" noise (404 / delisted / no data). 
+    # Suppress yfinance "symbol-not-found" noise (404 / delisted / no data).
     yfinance_noise = re.compile(r"HTTP Error 404|possibly delisted|No data found")
 
     class YFinanceNoiseFilter(logging.Filter):
@@ -85,11 +91,11 @@ def fetch_price(ticker):
     """Fetches price for a given ticker.
 
     Returns None when no usable price is found. Callers are responsible for
-    deciding whether that constitutes a failure, so this function intentionally 
+    deciding whether that constitutes a failure, so this function intentionally
     stays silent on the common "not found" path.
     """
     try:
-        data = yf.Ticker(ticker)
+        data = yf.Ticker(ticker, session=yf_session)
         # 1. Try fast_info (quickest, real-time)
         price = data.fast_info.get("last_price")
         # 2. Fallback to recent history (period="5d" covers weekends and holidays)
@@ -108,6 +114,7 @@ def fetch_price(ticker):
 
 def run_parallel_update(client, database_id, process_func, update_state, label):
     """Generic runner for Notion database updates."""
+
     def worker(page):
         try:
             # The process_func should return (identifier, new_props) or raise exceptions
