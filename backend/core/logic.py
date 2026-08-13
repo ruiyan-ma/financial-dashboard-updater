@@ -2,6 +2,7 @@ import os
 import sys
 import threading
 import logging
+import time
 import httpx
 from dotenv import load_dotenv
 
@@ -35,7 +36,8 @@ class Config:
         self.model_base_url = os.environ.get(
             "MODEL_BASE_URL", "https://api.siliconflow.cn/v1"
         )
-        self.model_name = os.environ.get("MODEL_NAME", "zai-org/GLM-4.5V")
+        self.model_name = os.environ.get("MODEL_NAME", "Qwen/Qwen3.6-35B-A3B")
+        self.xact_option_cache_ttl = int(os.environ.get("XACT_OPTION_CACHE_TTL", 300))
         self.port = int(os.environ.get("TRIGGER_PORT", 5001))
         self.lock = threading.Lock()  # prevents overlapping cycles
 
@@ -65,7 +67,10 @@ config.validate()
 
 # All API clients bypass shell proxy settings
 notion_client = Client(auth=config.token, client=httpx.Client(trust_env=False))
-xact_service = XactService(notion_client)
+xact_service = XactService(
+    notion_client,
+    config.xact_option_cache_ttl,
+)
 openai_client = OpenAI(
     api_key=config.model_api_key,
     base_url=config.model_base_url,
@@ -106,26 +111,30 @@ def get_cat_and_acct_opts():
 
     Used by the frontend to populate dropdown options.
     """
-    category_map = xact_service.fetch_category_map(config.category_db_id, refresh=True)
-    account_map = xact_service.fetch_account_map(config.account_db_id, refresh=True)
+    category_map, account_map = xact_service.fetch_category_and_account(
+        config.category_db_id, config.account_db_id
+    )
 
     categories = list(category_map.keys())
     accounts = list(account_map.keys())
     return {"categories": categories, "accounts": accounts}
 
 
-def get_xact_data_from_img(image_bytes, refresh=False):
+def get_xact_data_from_img(image_bytes):
     """
     Extracts transaction data from an image using AI.
 
-    Refreshes category_map and account_map for iOS Shortcut automation.
+    Refreshes category and account if cache is expired or empty.
     """
+    start_time = time.perf_counter()
+
     # 1. Process image
     processed_image = process_image(image_bytes)
 
     # 2. Fetch category_map and account_map
-    category_map = xact_service.fetch_category_map(config.category_db_id, refresh)
-    account_map = xact_service.fetch_account_map(config.account_db_id, refresh)
+    category_map, account_map = xact_service.fetch_category_and_account(
+        config.category_db_id, config.account_db_id
+    )
 
     # 3. AI Extraction
     extracted_data = extract_xact_data(
@@ -136,13 +145,20 @@ def get_xact_data_from_img(image_bytes, refresh=False):
         account_map,
     )
 
+    logger.info(
+        "Transaction extracted in %.2fs using %s",
+        time.perf_counter() - start_time,
+        config.model_name,
+    )
+
     return extracted_data
 
 
 def create_xact_entry(transaction):
     """Creates an Income/Expense entry from user-confirmed data."""
-    category_map = xact_service.fetch_category_map(config.category_db_id)
-    account_map = xact_service.fetch_account_map(config.account_db_id)
+    category_map, account_map = xact_service.fetch_category_and_account(
+        config.category_db_id, config.account_db_id
+    )
 
     notion_url = create_new_entry(
         notion_client, config.inc_exp_db_id, transaction, category_map, account_map

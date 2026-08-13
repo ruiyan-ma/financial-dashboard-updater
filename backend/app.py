@@ -221,9 +221,9 @@ def xact_shortcut():
         if file.filename == "":
             return jsonify({"success": False, "error": "Empty filename"}), 400
 
-        # 1. Extract Data: Need to refresh category_map and account_map
+        # 1. Extract data. Need to refresh category/account caches when their TTL expires.
         image_bytes = file.read()
-        extracted_data = get_xact_data_from_img(image_bytes, refresh=True)
+        extracted_data = get_xact_data_from_img(image_bytes)
 
         # 2. Check minimal viability (Amount and Date)
         if not extracted_data.get("amount") or not extracted_data.get("date"):

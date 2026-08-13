@@ -1,11 +1,12 @@
 import json
 import io
 import base64
+import time
 from PIL import Image, UnidentifiedImageError
 from backend.services.utils import get_title
 
-MAX_IMAGE_SIZE = 1024
-JPEG_QUALITY = 85
+MAX_IMAGE_SIZE = 1536
+JPEG_QUALITY = 90
 MAX_TOKEN = 120
 DEFAULT_ACCOUNT_TYPE = "checking"
 INCOME_ICON = "https://www.notion.so/icons/arrow-down_green.svg"
@@ -23,18 +24,20 @@ class ModelResponseError(ValueError):
 class XactService:
     """Stateful service for transaction (Income/Expense) tracking operations."""
 
-    def __init__(self, notion_client):
+    def __init__(self, notion_client, cache_ttl):
         """Initialize the service with a Notion Client instance."""
         self.notion = notion_client
+        self.cache_ttl = cache_ttl
         self._category_map = {}
         self._account_map = {}
+        self._cached_time = 0.0
 
-    def fetch_category_map(self, db_id, refresh=False):
-        """Fetches categories with type (Income/Expense) and page ID."""
-        if not refresh and self._category_map:
-            return self._category_map
+    def fetch_category_and_account(self, cat_db_id, acct_db_id):
+        """Fetches category and account when cache is expired or empty."""
+        if time.monotonic() - self._cached_time < self.cache_ttl:
+            return self._category_map, self._account_map
 
-        results = self.notion.databases.query(database_id=db_id).get("results", [])
+        results = self.notion.databases.query(database_id=cat_db_id).get("results", [])
         category_map = {}
 
         for page in results:
@@ -47,15 +50,7 @@ class XactService:
             typ_val = props.get("Type", {}).get("select", {}).get("name", "Expense")
             category_map[name] = {"type": typ_val, "id": page["id"]}
 
-        self._category_map = category_map
-        return category_map
-
-    def fetch_account_map(self, db_id, refresh=False):
-        """Fetches accounts with page ID."""
-        if not refresh and self._account_map:
-            return self._account_map
-
-        results = self.notion.databases.query(database_id=db_id).get("results", [])
+        results = self.notion.databases.query(database_id=acct_db_id).get("results", [])
         account_map = {}
 
         for page in results:
@@ -69,8 +64,10 @@ class XactService:
             if acc_type.lower() == DEFAULT_ACCOUNT_TYPE.lower():
                 account_map[name] = page["id"]
 
+        self._category_map = category_map
         self._account_map = account_map
-        return account_map
+        self._cached_time = time.monotonic()
+        return category_map, account_map
 
 
 def process_image(image_bytes):
@@ -137,9 +134,9 @@ def extract_xact_data(
         name for name, data in category_map.items() if data["type"] == "Expense"
     ]
 
-    income_str = ", ".join(incomes) if incomes else "N/A"
-    expense_str = ", ".join(expenses) if expenses else "N/A"
-    account_str = ", ".join(account_map.keys())
+    income_str = json.dumps(incomes, ensure_ascii=False)
+    expense_str = json.dumps(expenses, ensure_ascii=False)
+    account_str = json.dumps(list(account_map), ensure_ascii=False)
 
     prompt = f"""
 Analyze this image and extract transaction details.
@@ -148,20 +145,20 @@ Return ONLY raw JSON in this format:
 {{"merchant": "store/merchant name", "amount": number, "category": "from list", "account": "from list", "date": "YYYY-MM-DD"}}
 
 Field rules:
-- Merchant: select the value from '商品说明' field if available, otherwise use the bold title text.
-- Amount: determine income or expense from the original amount shown in the image, but return the absolute value only.
+- Merchant: select '商品说明' if available, otherwise use the bold title text.
+- Amount: determine income or expense from the original amount, but return its absolute value.
 - Category:
-  - If the original amount is positive, choose only from [{income_str}]
-  - If the original amount is negative, choose only from [{expense_str}]
+  - Income: choose the best match from {income_str}
+  - Expense: choose the best match from {expense_str}
 - Account: read '支付方式' or '付款方式'
   - WeChat keywords: '零钱', '微信支付'
-  - Alipay keywords: '余额', '花呗', '余额宝'
-  - Bank cards: use the exact bank name shown
-  - MUST choose from: [{account_str}]
+  - Alipay keywords: '支付宝', '余额', '花呗', '余额宝'
+  - Bank cards: match the bank name shown
+  - Choose the best match from {account_str}
 
 General rules:
 1. If the image is NOT a receipt, transaction, or bill, set all fields to null.
-2. If any specific field is missing or uncertain, set only that field to null.
+2. Infer the best reasonable value for every field. Use null only when a field cannot be read or reasonably inferred.
 3. Return JSON only. No explanation, no markdown, no code fences.
 """
 
@@ -185,6 +182,8 @@ General rules:
         temperature=0,
         max_tokens=MAX_TOKEN,
         messages=messages,
+        response_format={"type": "json_object"},
+        extra_body={"enable_thinking": False},
     )
     return _parse_model_json(res.choices[0].message.content)
 

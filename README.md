@@ -27,7 +27,7 @@ AI 自动记账功能使用 OpenAI 兼容格式的 API，你可以选择提供�
 
 ⚠️ 所选模型必须为**视觉多模态模型**（支持 `image_url` 类型的消息内容）
 
-默认使用 [SiliconFlow](https://cloud.siliconflow.cn) + GLM-4.5V 模型，如需更换平台或模型，修改 `MODEL_BASE_URL` 和 `MODEL_NAME` 即可
+默认使用 [SiliconFlow](https://cloud.siliconflow.cn) + Qwen3.6-35B-A3B 模型，如需更换平台或模型，修改 `MODEL_BASE_URL` 和 `MODEL_NAME` 即可
 
 ### 使用 Docker 部署（推荐）
 
