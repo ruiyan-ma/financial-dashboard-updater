@@ -28,7 +28,7 @@ def process_asset(page):
         raise Exception("Market is empty!")
 
     target_ticker = format_ticker(ticker, market)
-    price = fetch_price(target_ticker)
+    price = fetch_price(target_ticker, market)
     if price is None:
         raise Exception(f"Could not find price for {ticker}")
 
