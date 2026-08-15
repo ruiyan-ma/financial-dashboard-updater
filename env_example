@@ -1,10 +1,21 @@
 # Notion Config
 INTERNAL_INTEGRATION_TOKEN=your_notion_token
+
 ASSETS_DATABASE_ID=your_assets_db_id
-CURRENCIES_DATABASE_ID=your_currency_db_id
+HOLDINGS_DATABASE_ID=your_holdings_db_id
+PLATFORMS_DATABASE_ID=your_platforms_db_id
+TRANSACTIONS_DATABASE_ID=your_transactions_db_id
+DIVIDENDS_DATABASE_ID=your_dividends_db_id
+
+PROPERTIES_DATABASE_ID=your_properties_db_id
+ACCOUNTS_DATABASE_ID=your_accounts_db_id
 INC_EXP_DATABASE_ID=your_income_expense_db_id
 CATEGORIES_DATABASE_ID=your_categories_db_id
-ACCOUNTS_DATABASE_ID=your_accounts_db_id
+CURRENCIES_DATABASE_ID=your_currency_db_id
+
+NET_VALUE_DATABASE_ID=your_net_value_db_id
+GROWTH_LOG_DATABASE_ID=your_growth_log_db_id
+AI_SNAPSHOT_PAGE_ID=your_ai_snapshot_page_id
 
 # AI Model Config (OpenAI-compatible provider)
 MODEL_API_KEY=your_model_api_key

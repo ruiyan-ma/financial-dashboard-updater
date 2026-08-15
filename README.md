@@ -90,6 +90,18 @@ http://<your-machine-ip>:5001/api/transaction/shortcut
 
 3. **远程触发**：只需在手机浏览器访问 `http://100.x.x.x:5001` 即可触发更新
 
+## 让 AI 读取 Dashboard 内容
+
+在 Codex 或 Claude Code 上安装 Notion 插件后，由于 AI 无法读取 Formula 属性的计算结果，我们需要为其生成 JSON Snapshot
+
+```bash
+python3 gen_snapshot.py
+```
+
+脚本读取 Asset、Platform、Net Value 和 Growth Log 数据库，并将 JSON 写入 `AI Snapshot` 页面
+
+为减少无效数据，美元市值为零的 Asset、总价值为零的 Platform，以及持仓数量为零的 Holding 不会出现在 Snapshot 中
+
 ## 项目结构
 
 ```text
@@ -100,6 +112,7 @@ http://<your-machine-ip>:5001/api/transaction/shortcut
 ├── docker-compose.yml    # Docker Compose 编排配置
 ├── requirements.txt      # Python 依赖
 ├── run.py                # 服务启动入口
+├── gen_snapshot.py       # 生成 JSON Snapshot
 ├── backend/              # 后端代码
 │   ├── app.py            # Flask 路由
 │   ├── core/             # 核心引擎
