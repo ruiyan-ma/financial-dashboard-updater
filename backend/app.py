@@ -1,5 +1,5 @@
+import hmac
 import logging
-import threading
 import openai
 from flask import Flask, render_template, jsonify, request
 from backend.core.state import global_state
@@ -21,6 +21,24 @@ app = Flask(
 )
 
 
+@app.before_request
+def authenticate_api():
+    """Require a Bearer token for transaction and updater APIs."""
+    protected_paths = ("/api/transaction/", "/api/updater/")
+    if not request.path.startswith(protected_paths):
+        return None
+
+    expected_token = config.shortcut_api_token
+    if not expected_token:
+        return None
+
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    if scheme != "Bearer" or not hmac.compare_digest(token, expected_token):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
+    return None
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -29,6 +47,11 @@ def index():
 @app.route("/updater")
 def updater_page():
     return render_template("updater.html")
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
 
 @app.route("/api/updater/status")
@@ -41,9 +64,7 @@ def updater_trigger():
     if global_state.get_snapshot()["isRunning"]:
         return jsonify({"success": False, "message": "Update already in progress"}), 409
 
-    # Start in background
-    threading.Thread(target=run_all_updates, daemon=True).start()
-    return jsonify({"success": True, "message": "Update started"})
+    return jsonify(run_all_updates())
 
 
 @app.route("/api/transaction/options")

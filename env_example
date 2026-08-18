@@ -1,5 +1,6 @@
 # Notion Config
 INTERNAL_INTEGRATION_TOKEN=your_notion_token
+SHORTCUT_API_TOKEN=your_random_shortcut_token
 
 ASSETS_DATABASE_ID=your_assets_db_id
 HOLDINGS_DATABASE_ID=your_holdings_db_id

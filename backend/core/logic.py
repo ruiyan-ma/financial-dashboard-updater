@@ -38,7 +38,8 @@ class Config:
         )
         self.model_name = os.environ.get("MODEL_NAME", "Qwen/Qwen3.6-35B-A3B")
         self.xact_option_cache_ttl = int(os.environ.get("XACT_OPTION_CACHE_TTL", 300))
-        self.port = int(os.environ.get("TRIGGER_PORT", 5001))
+        self.shortcut_api_token = os.environ.get("SHORTCUT_API_TOKEN")
+        self.port = int(os.environ.get("PORT", os.environ.get("TRIGGER_PORT", 5001)))
         self.lock = threading.Lock()  # prevents overlapping cycles
 
     def validate(self):
@@ -52,6 +53,9 @@ class Config:
             "ACCOUNTS_DATABASE_ID": self.account_db_id,
             "MODEL_API_KEY": self.model_api_key,
         }
+        if os.environ.get("K_SERVICE"):
+            required["SHORTCUT_API_TOKEN"] = self.shortcut_api_token
+
         missing = [name for name, val in required.items() if not val]
         if missing:
             print(
@@ -79,15 +83,22 @@ openai_client = OpenAI(
 
 
 def run_all_updates():
-    """Triggers both Assets and Currencies updates."""
+    """Update market data and publish a snapshot as one cycle."""
     if not config.lock.acquire(blocking=False):
         logger.warning("Update already in progress. Skipping.")
-        return
+        return global_state.get_snapshot()
 
     try:
         global_state.start_cycle()
         update_assets(notion_client, config.assets_db_id, global_state)
         update_currencies(notion_client, config.currency_db_id, global_state)
+
+        if global_state.get_snapshot()["success"]:
+            from refresh_dashboard import publish_snapshot
+
+            global_state.set_phase("Publishing Snapshot...", 1)
+            publish_snapshot()
+            global_state.update_progress("✅ Snapshot published", "success")
 
     except Exception as e:
         logger.exception("Unexpected error in run_all_updates.")
@@ -103,6 +114,8 @@ def run_all_updates():
 
         global_state.finish_cycle()
         config.lock.release()
+
+    return global_state.get_snapshot()
 
 
 def get_cat_and_acct_opts():

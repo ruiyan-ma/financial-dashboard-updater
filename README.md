@@ -8,8 +8,9 @@ Notion Financial Dashboard 自动化工具：用于更新资产价格和汇率�
 - **多市场支持**：支持美股、港股、A股、黄金、加密货币
 - **多币种支持**：支持多种计价货币，支持自定义默认计价货币
 - **并行更新**：利用多线程技术同步更新数据
-- **定时更新**：每 60 分钟自动更新
-- **手动触发**：通过访问本地指定的 Web 端口（默认 5001）即可立即刷新
+- **定时更新**：通过 Cloud Run 每小时自动更新
+- **手动触发**：通过 Web 页面立即刷新
+- **自动快照**：价格和汇率更新成功后，将 Dashboard Snapshot 写入 Notion
 
 ### 🤖 AI 自动记账
 - **智能识别**：使用大模型自动识别支付截图中的交易信息
@@ -45,9 +46,7 @@ docker stop notion-updater
 docker restart notion-updater
 ```
 
-程序启动后，会在每小时的第 30 分钟自动执行更新操作
-
-访问 `http://localhost:5001`（或你自定义的端口）即可手动触发更新，并使用自动记账功能
+访问 `http://localhost:5001`（或你自定义的端口）即可使用自动记账和手动更新功能
 
 ### 本地部署
 
@@ -76,6 +75,14 @@ python3 run.py
 http://<your-machine-ip>:5001/api/transaction/shortcut
 ```
 
+如果部署在 Cloud Run，还需要在 “Get contents of URL” 中添加请求头：
+
+```text
+Authorization: Bearer <SHORTCUT_API_TOKEN>
+```
+
+URL 改为 Cloud Run 提供的 HTTPS 地址，路径仍为 `/api/transaction/shortcut`。
+
 打开 “设置” -> “辅助功能” -> “触控” -> “轻点背面” -> “轻点两下”，然后选择 “Notion Updater” 快捷指令
 
 完成上述设置后，就可以通过“双击手机背面”来调取快捷指令，自动完成记账
@@ -95,12 +102,18 @@ http://<your-machine-ip>:5001/api/transaction/shortcut
 在 Codex 或 Claude Code 上安装 Notion 插件后，由于 AI 无法读取 Formula 属性的计算结果，我们需要为其生成 JSON Snapshot
 
 ```bash
-python3 gen_snapshot.py
+python3 refresh_dashboard.py
 ```
 
-脚本读取 Asset、Platform、Net Value 和 Growth Log 数据库，并将 JSON 写入 `AI Snapshot` 页面
+脚本先更新 Asset 价格和 Currency 汇率；全部更新成功后，再读取 Asset、Platform、Net Value 和 Growth Log 数据库，并将 JSON 写入 `AI Snapshot` 页面
 
 为减少无效数据，美元市值为零的 Asset、总价值为零的 Platform，以及持仓数量为零的 Holding 不会出现在 Snapshot 中
+
+## Cloud Run
+
+Cloud Run 托管自动记账网页和 API；`dashboard-refresh` Job 更新价格并生成 Snapshot，由 Cloud Scheduler 在每小时的第 30 分钟触发。
+
+网页首次访问时需要输入 `SHORTCUT_API_TOKEN`。Notion Integration 还需要拥有相关数据库及其 Formula、Rollup 所依赖数据库的访问权限。
 
 ## 项目结构
 
@@ -112,6 +125,7 @@ python3 gen_snapshot.py
 ├── docker-compose.yml    # Docker Compose 编排配置
 ├── requirements.txt      # Python 依赖
 ├── run.py                # 服务启动入口
+├── refresh_dashboard.py  # 更新价格并生成 Snapshot
 ├── gen_snapshot.py       # 生成 JSON Snapshot
 ├── backend/              # 后端代码
 │   ├── app.py            # Flask 路由

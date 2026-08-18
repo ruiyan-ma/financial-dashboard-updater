@@ -6,6 +6,15 @@
  * 2. Transaction Tracker (`/`): Manages receipt scanning, data extraction, and Notion entry creation.
  */
 
+function authHeaders(extra = {}) {
+    let token = sessionStorage.getItem("apiToken");
+    if (!token) {
+        token = window.prompt("Enter API token:");
+        if (token) sessionStorage.setItem("apiToken", token);
+    }
+    return { ...extra, Authorization: `Bearer ${token || ""}` };
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     // Determine current page context based on body ID
     if (document.getElementById("dashboard-view")) {
@@ -60,8 +69,10 @@ class DashboardController {
         try {
             this.dom.updateBtn.disabled = true;
             this.dom.updateBtn.textContent = "Requesting...";
-
-            const res = await fetch("/api/updater/trigger", { method: "POST" });
+            const res = await fetch("/api/updater/trigger", {
+                method: "POST",
+                headers: authHeaders(),
+            });
             if (!res.ok) {
                 const data = await res.json();
                 alert(data.message);
@@ -82,7 +93,9 @@ class DashboardController {
      */
     async pollStatus() {
         try {
-            const response = await fetch("/api/updater/status");
+            const response = await fetch("/api/updater/status", {
+                headers: authHeaders(),
+            });
             const data = await response.json();
             this.updateUI(data);
 
@@ -247,7 +260,7 @@ class TransactionController {
     /** Fetch Categories and Accounts from backend */
     async fetchOptions() {
         try {
-            const response = await fetch(this.API.OPTIONS);
+            const response = await fetch(this.API.OPTIONS, { headers: authHeaders() });
             const result = await response.json();
             if (result.success) {
                 this.categories = result.categories || [];
@@ -323,6 +336,7 @@ class TransactionController {
 
             const response = await fetch(this.API.UPLOAD, {
                 method: "POST",
+                headers: authHeaders(),
                 body: formData,
             });
 
@@ -358,7 +372,7 @@ class TransactionController {
         try {
             const response = await fetch(this.API.CONFIRM, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: authHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify(data),
             });
 
