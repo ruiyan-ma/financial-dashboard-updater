@@ -1,13 +1,15 @@
+"""Image, model, and Notion operations for transaction tracking."""
+
 import json
 import io
 import base64
 import time
 from PIL import Image, UnidentifiedImageError
-from backend.services.utils import get_title
+from shared.utils import get_title
 
 MAX_IMAGE_SIZE = 1536
 JPEG_QUALITY = 90
-MAX_TOKEN = 120
+MAX_TOKENS = 120
 DEFAULT_ACCOUNT_TYPE = "checking"
 INCOME_ICON = "https://www.notion.so/icons/arrow-down_green.svg"
 EXPENSE_ICON = "https://www.notion.so/icons/arrow-up_red.svg"
@@ -21,23 +23,24 @@ class ModelResponseError(ValueError):
     """Raised when the vision model returns an unusable response."""
 
 
-class XactService:
-    """Stateful service for transaction (Income/Expense) tracking operations."""
+class TransactionCache:
+    """Caches category and account mappings from Notion to reduce API calls."""
 
-    def __init__(self, notion_client, cache_ttl):
-        """Initialize the service with a Notion Client instance."""
-        self.notion = notion_client
-        self.cache_ttl = cache_ttl
+    def __init__(self, notion_client, cache_ttl_seconds):
+        self.notion_client = notion_client
+        self.cache_ttl_seconds = cache_ttl_seconds
         self._category_map = {}
         self._account_map = {}
-        self._cached_time = 0.0
+        self._cached_at = 0.0
 
-    def fetch_category_and_account(self, cat_db_id, acct_db_id):
-        """Fetches category and account when cache is expired or empty."""
-        if time.monotonic() - self._cached_time < self.cache_ttl:
+    def get_category_and_account_maps(self, category_db_id, account_db_id):
+        """Refreshes the category and account mappings if the cache has expired."""
+        if time.monotonic() - self._cached_at < self.cache_ttl_seconds:
             return self._category_map, self._account_map
 
-        results = self.notion.databases.query(database_id=cat_db_id).get("results", [])
+        results = self.notion_client.databases.query(database_id=category_db_id).get(
+            "results", []
+        )
         category_map = {}
 
         for page in results:
@@ -47,10 +50,14 @@ class XactService:
                 continue
 
             # Extract category type (Income/Expense) and ID
-            typ_val = props.get("Type", {}).get("select", {}).get("name", "Expense")
-            category_map[name] = {"type": typ_val, "id": page["id"]}
+            category_type = (
+                props.get("Type", {}).get("select", {}).get("name", "Expense")
+            )
+            category_map[name] = {"type": category_type, "id": page["id"]}
 
-        results = self.notion.databases.query(database_id=acct_db_id).get("results", [])
+        results = self.notion_client.databases.query(database_id=account_db_id).get(
+            "results", []
+        )
         account_map = {}
 
         for page in results:
@@ -60,46 +67,38 @@ class XactService:
                 continue
 
             # Filter by account type
-            acc_type = props.get("Type", {}).get("select", {}).get("name", "")
-            if acc_type.lower() == DEFAULT_ACCOUNT_TYPE.lower():
+            account_type = props.get("Type", {}).get("select", {}).get("name", "")
+            if account_type.lower() == DEFAULT_ACCOUNT_TYPE.lower():
                 account_map[name] = page["id"]
 
         self._category_map = category_map
         self._account_map = account_map
-        self._cached_time = time.monotonic()
+        self._cached_at = time.monotonic()
         return category_map, account_map
 
 
-def process_image(image_bytes):
-    """Optimizes images for AI analysis by resizing and converting to JPEG."""
+def prepare_image(image_bytes):
+    """Resize an uploaded image when needed and convert it to JPEG."""
     try:
-        img = Image.open(io.BytesIO(image_bytes))
-        img = img.convert("RGB")
+        image = Image.open(io.BytesIO(image_bytes))
+        image = image.convert("RGB")
 
         # Resize large images to reduce API latency and cost
-        if max(img.size) > MAX_IMAGE_SIZE:
-            img.thumbnail((MAX_IMAGE_SIZE, MAX_IMAGE_SIZE), Image.Resampling.LANCZOS)
+        if max(image.size) > MAX_IMAGE_SIZE:
+            image.thumbnail((MAX_IMAGE_SIZE, MAX_IMAGE_SIZE), Image.Resampling.LANCZOS)
 
         # Convert to JPEG bytes
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=JPEG_QUALITY)
-        return buf.getvalue()
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=JPEG_QUALITY)
+        return buffer.getvalue()
 
-    except (UnidentifiedImageError, OSError) as e:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
         raise ImageProcessingError("Invalid image file") from e
 
 
 def _parse_model_json(content):
     """Parses the JSON object in the model response."""
-    if isinstance(content, list):
-        text = "\n".join(
-            item.get("text") if isinstance(item, dict) else getattr(item, "text", "")
-            for item in content
-        )
-    else:
-        text = str(content or "")
-
-    text = text.strip()
+    text = str(content or "").strip()
     if not text:
         raise ModelResponseError("Model returned empty response.")
 
@@ -121,10 +120,10 @@ def _parse_model_json(content):
         ) from e
 
 
-def extract_xact_data(
+def extract_transaction_data(
     image_bytes, openai_client, model_name, category_map, account_map
 ):
-    """Extracts transaction details from an image using vision LLM."""
+    """Extracts transaction details from an image using a vision model."""
     if openai_client is None:
         raise ValueError("OpenAI client is not initialized")
 
@@ -177,19 +176,31 @@ General rules:
         },
     ]
 
-    res = openai_client.chat.completions.create(
+    response = openai_client.chat.completions.create(
         model=model_name,
         temperature=0,
-        max_tokens=MAX_TOKEN,
+        max_tokens=MAX_TOKENS,
         messages=messages,
         response_format={"type": "json_object"},
         extra_body={"enable_thinking": False},
     )
-    return _parse_model_json(res.choices[0].message.content)
+    try:
+        content = response.choices[0].message.content
+    except (AttributeError, IndexError, TypeError) as e:
+        raise ModelResponseError(
+            "Model response did not contain message content."
+        ) from e
+    return _parse_model_json(content)
 
 
-def create_new_entry(client, db_id, transaction, category_map, account_map):
-    """Creates a new Income/Expense entry.
+def create_transaction_page(
+    notion_client,
+    database_id,
+    transaction,
+    category_map,
+    account_map,
+):
+    """Creates a new Notion Income/Expense page.
 
     Callers should have validated that amount and date are present.
     """
@@ -221,8 +232,8 @@ def create_new_entry(client, db_id, transaction, category_map, account_map):
         props["Account"] = {"relation": [{"id": account_id}]}
 
     # Create the Notion page
-    page = client.pages.create(
-        parent={"database_id": db_id},
+    page = notion_client.pages.create(
+        parent={"database_id": database_id},
         properties={k: v for k, v in props.items() if v},  # Filter out None values
         icon={"type": "external", "external": {"url": icon_url}},
     )

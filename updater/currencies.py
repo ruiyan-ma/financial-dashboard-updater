@@ -1,7 +1,7 @@
-from backend.services.utils import (
+from shared.utils import get_title
+from updater.market_data import (
     fetch_gold_price,
     fetch_usd_rates,
-    get_title,
     run_parallel_update,
 )
 
@@ -34,7 +34,7 @@ def calculate_rates(base_code, props, usd_rates, gold_usd_ounce):
 
 
 def process_currency(page, usd_rates, gold_usd_ounce):
-    """Processes a single currency row from Notion."""
+    """Return the Notion properties to update, or raise if processing fails."""
     props = page["properties"]
 
     # Extract Name (Title)
@@ -44,21 +44,17 @@ def process_currency(page, usd_rates, gold_usd_ounce):
 
     code = code.strip().upper()
     updated_props = calculate_rates(code, props, usd_rates, gold_usd_ounce)
-    return code, updated_props
+    return updated_props
 
 
-def update_currencies(client, database_id, update_state):
-    """Main entry for currency updates."""
+def update_currencies(database_id):
+    """Update all Currency pages concurrently."""
 
     # Fetch one coherent rate snapshot per cycle
     usd_rates = fetch_usd_rates()
     gold_usd_ounce = fetch_gold_price()
-    if gold_usd_ounce is None:
-        raise Exception("Could not find price for Gold")
 
     def process_with_snapshot(page):
         return process_currency(page, usd_rates, gold_usd_ounce)
 
-    run_parallel_update(
-        client, database_id, process_with_snapshot, update_state, "Currencies"
-    )
+    run_parallel_update(database_id, process_with_snapshot, "Currencies")

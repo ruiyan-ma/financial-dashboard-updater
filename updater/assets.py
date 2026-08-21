@@ -1,4 +1,4 @@
-from backend.services.utils import fetch_price, run_parallel_update
+from updater.market_data import fetch_price, run_parallel_update
 
 
 def format_ticker(ticker, market=None):
@@ -13,7 +13,7 @@ def format_ticker(ticker, market=None):
 
 
 def process_asset(page):
-    """Processes a single asset page for the parallel updater."""
+    """Return the Notion properties to update, or raise if processing fails."""
     props = page["properties"]
 
     # Extract Ticker (Text) and Market (Select)
@@ -29,12 +29,9 @@ def process_asset(page):
 
     target_ticker = format_ticker(ticker, market)
     price = fetch_price(target_ticker, market)
-    if price is None:
-        raise Exception(f"Could not find price for {ticker}")
-
-    return ticker, {"Price": {"number": float(price)}}
+    return {"Price": {"number": float(price)}}
 
 
-def update_assets(client, database_id, update_state):
-    """Main entry point for asset updates."""
-    run_parallel_update(client, database_id, process_asset, update_state, "Assets")
+def update_assets(database_id):
+    """Update all Asset pages concurrently."""
+    run_parallel_update(database_id, process_asset, "Assets")
