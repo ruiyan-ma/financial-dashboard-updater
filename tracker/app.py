@@ -1,24 +1,34 @@
+"""Flask routes for the transaction tracker."""
+
 import logging
-import threading
 import openai
 from flask import Flask, render_template, jsonify, request
-from backend.core.state import global_state
-from backend.core.logic import (
-    config,
-    run_all_updates,
-    get_cat_and_acct_opts,
-    get_xact_data_from_img,
-    create_xact_entry,
+from tracker.service import (
+    get_category_and_account,
+    extract_transaction_from_image,
+    create_transaction,
 )
-from backend.services.xact_service import ImageProcessingError, ModelResponseError
+from tracker.transactions import ImageProcessingError, ModelResponseError
 
 logger = logging.getLogger(__name__)
 
-app = Flask(
-    __name__,
-    template_folder="../frontend/templates",
-    static_folder="../frontend/static",
-)
+app = Flask(__name__)
+
+
+def _validate_transaction(data):
+    """Return whether amount and date fields contain valid data."""
+    if not isinstance(data, dict):
+        return False
+
+    amount = data.get("amount")
+    date = data.get("date")
+
+    return (
+        isinstance(amount, (int, float))
+        and not isinstance(amount, bool)
+        and isinstance(date, str)
+        and bool(date)
+    )
 
 
 @app.route("/")
@@ -26,28 +36,8 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/updater")
-def updater_page():
-    return render_template("updater.html")
-
-
-@app.route("/api/updater/status")
-def updater_status():
-    return jsonify(global_state.get_snapshot())
-
-
-@app.route("/api/updater/trigger", methods=["POST"])
-def updater_trigger():
-    if global_state.get_snapshot()["isRunning"]:
-        return jsonify({"success": False, "message": "Update already in progress"}), 409
-
-    # Start in background
-    threading.Thread(target=run_all_updates, daemon=True).start()
-    return jsonify({"success": True, "message": "Update started"})
-
-
 @app.route("/api/transaction/options")
-def xact_options():
+def transaction_options():
     """
     API endpoint to fetch available categories and accounts.
 
@@ -65,10 +55,10 @@ def xact_options():
         500: Server error (database query failed)
     """
     try:
-        options = get_cat_and_acct_opts()
+        options = get_category_and_account()
         return jsonify({"success": True, **options})
-    except Exception as e:
-        logger.exception("Failed on xact_options.")
+    except Exception:
+        logger.exception("Failed to load transaction options.")
         return (
             jsonify(
                 {"success": False, "error": "Failed to load categories and accounts"}
@@ -78,7 +68,7 @@ def xact_options():
 
 
 @app.route("/api/transaction/upload", methods=["POST"])
-def xact_upload():
+def transaction_upload():
     """
     API endpoint to handle transaction image upload and AI extraction.
 
@@ -95,10 +85,10 @@ def xact_upload():
     Status Codes:
         200: Success
         400: Bad request (no file, empty filename, or invalid image)
-        422: Unprocessable entity (AI extraction failed to find amount or date)
+        422: Model response does not contain valid transaction fields
         500: Server error (processing or AI extraction failed)
-        502: Upstream model returned an invalid response
-        504: Upstream model API timeout or connection failure
+        502: Upstream model returned an invalid response or API failure
+        504: Upstream model API timeout
     """
     try:
         # Validate file upload
@@ -112,40 +102,40 @@ def xact_upload():
         # Read image bytes
         image_bytes = file.read()
 
-        # 1. Extract transaction data
-        extracted_data = get_xact_data_from_img(image_bytes)
+        # Extract transaction data
+        extracted_data = extract_transaction_from_image(image_bytes)
 
-        # 2. Check minimal viability (Amount and Date)
-        if not extracted_data.get("amount") or not extracted_data.get("date"):
+        # Validate transaction data
+        if not _validate_transaction(extracted_data):
             return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "AI model failed to find amount or date",
-                    }
-                ),
+                jsonify({"success": False, "error": "Invalid transaction data"}),
                 422,
             )
-        extracted_data["amount"] = abs(float(extracted_data["amount"]))
+        extracted_data["amount"] = abs(extracted_data["amount"])
 
         return jsonify({"success": True, "data": extracted_data})
 
     except ImageProcessingError as e:
-        logger.warning("Invalid image uploaded in xact_upload: %s", e)
         return jsonify({"success": False, "error": str(e)}), 400
     except ModelResponseError as e:
-        logger.warning("Invalid model response in xact_upload: %s", e, exc_info=True)
+        logger.warning("Invalid model response: %s", e)
         return jsonify({"success": False, "error": "Model returned invalid data"}), 502
-    except (openai.APITimeoutError, openai.APIConnectionError) as e:
-        logger.warning("Model API unavailable in xact_upload: %s", e)
-        return jsonify({"success": False, "error": "Model API timed out or unreachable"}), 504
-    except Exception as e:
-        logger.exception("Failed on xact_upload.")
-        return jsonify({"success": False, "error": "Failed to process transaction image"}), 500
+    except openai.APITimeoutError as e:
+        logger.warning("Model API timed out: %s", e)
+        return jsonify({"success": False, "error": "Model API timed out"}), 504
+    except openai.APIError as e:
+        logger.warning("Model API failed: %s", e)
+        return jsonify({"success": False, "error": "Model API unavailable"}), 502
+    except Exception:
+        logger.exception("Failed to extract transaction from image.")
+        return (
+            jsonify({"success": False, "error": "Failed to process transaction image"}),
+            500,
+        )
 
 
 @app.route("/api/transaction/confirm", methods=["POST"])
-def xact_confirm():
+def transaction_confirm():
     """
     API endpoint to create Notion entry from user-confirmed transaction data.
 
@@ -168,27 +158,31 @@ def xact_confirm():
 
     Status Codes:
         200: Success
-        400: Bad request (no data provided)
+        400: Bad request (invalid transaction data)
         500: Server error (Notion creation failed)
     """
     try:
         # Get user-confirmed data from request
-        data = request.get_json()
-        if not data:
-            return jsonify({"success": False, "error": "No data provided"}), 400
+        data = request.get_json(silent=True)
+        if not _validate_transaction(data):
+            return jsonify({"success": False, "error": "Invalid transaction data"}), 400
+        data["amount"] = abs(data["amount"])
 
         # Create Notion entry
-        notion_url = create_xact_entry(data)
+        notion_url = create_transaction(data)
 
         return jsonify({"success": True, "notionUrl": notion_url})
 
-    except Exception as e:
-        logger.exception("Failed on xact_confirm.")
-        return jsonify({"success": False, "error": "Failed to create Notion entry"}), 500
+    except Exception:
+        logger.exception("Failed to create confirmed transaction.")
+        return (
+            jsonify({"success": False, "error": "Failed to create Notion entry"}),
+            500,
+        )
 
 
 @app.route("/api/transaction/shortcut", methods=["POST"])
-def xact_shortcut():
+def transaction_shortcut():
     """
     API endpoint for one-step transaction tracking (extraction + page creation).
 
@@ -208,10 +202,10 @@ def xact_shortcut():
     Status Codes:
         200: Success
         400: Bad request (no file, empty filename, or invalid image)
-        422: Unprocessable entity (AI extraction failed to find amount or date)
+        422: Model response does not contain valid transaction fields
         500: Server error (image processing or AI extraction failed)
-        502: Upstream model returned an invalid response
-        504: Upstream model API timeout or connection failure
+        502: Upstream model returned an invalid response or API failure
+        504: Upstream model API timeout
     """
     try:
         if "file" not in request.files:
@@ -221,27 +215,22 @@ def xact_shortcut():
         if file.filename == "":
             return jsonify({"success": False, "error": "Empty filename"}), 400
 
-        # 1. Extract data. Need to refresh category/account caches when their TTL expires.
+        # Extract transaction data
         image_bytes = file.read()
-        extracted_data = get_xact_data_from_img(image_bytes)
+        extracted_data = extract_transaction_from_image(image_bytes)
 
-        # 2. Check minimal viability (Amount and Date)
-        if not extracted_data.get("amount") or not extracted_data.get("date"):
+        # Validate transaction data
+        if not _validate_transaction(extracted_data):
             return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "AI model failed to find amount or date",
-                    }
-                ),
+                jsonify({"success": False, "error": "Invalid transaction data"}),
                 422,
             )
-        extracted_data["amount"] = abs(float(extracted_data["amount"]))
+        extracted_data["amount"] = abs(extracted_data["amount"])
 
-        # 3. Create Entry
-        notion_url = create_xact_entry(extracted_data)
+        # Create Notion page
+        notion_url = create_transaction(extracted_data)
 
-        # 4. Construct friendly message for Shortcut
+        # Construct a friendly response for Shortcut
         message = (
             f"🏪 {extracted_data.get('merchant') or 'Unknown'}\n"
             f"💰 {extracted_data.get('amount') or 0}\n"
@@ -262,26 +251,19 @@ def xact_shortcut():
         )
 
     except ImageProcessingError as e:
-        logger.warning("Invalid image uploaded in xact_shortcut: %s", e)
         return jsonify({"success": False, "error": str(e)}), 400
     except ModelResponseError as e:
-        logger.warning("Invalid model response in xact_shortcut: %s", e, exc_info=True)
+        logger.warning("Invalid model response for Shortcut: %s", e)
         return jsonify({"success": False, "error": "Model returned invalid data"}), 502
-    except (openai.APITimeoutError, openai.APIConnectionError) as e:
-        logger.warning("Model API unavailable in xact_shortcut: %s", e)
-        return jsonify({"success": False, "error": "Model API timed out or unreachable"}), 504
-    except Exception as e:
-        logger.exception("Failed on xact_shortcut.")
-        return jsonify({"success": False, "error": "Failed to create Notion entry"}), 500
-
-
-def start_web_server():
-    """Starts the Flask server."""
-    # Turn off banner to keep console clean
-    import logging
-
-    log = logging.getLogger("werkzeug")
-    log.setLevel(logging.ERROR)
-
-    # Host needs to be 0.0.0.0 to be accessible if using tools like Tailscale mentioned in README
-    app.run(host="0.0.0.0", port=config.port)
+    except openai.APITimeoutError as e:
+        logger.warning("Model API timed out for Shortcut: %s", e)
+        return jsonify({"success": False, "error": "Model API timed out"}), 504
+    except openai.APIError as e:
+        logger.warning("Model API failed for Shortcut: %s", e)
+        return jsonify({"success": False, "error": "Model API unavailable"}), 502
+    except Exception:
+        logger.exception("Failed to create transaction for Shortcut.")
+        return (
+            jsonify({"success": False, "error": "Failed to create Notion entry"}),
+            500,
+        )

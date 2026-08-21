@@ -1,22 +1,13 @@
 """Read portfolio databases and publish a JSON snapshot to Notion."""
 
 import json
-import os
+import logging
 from datetime import datetime, timezone
 
-import httpx
-from dotenv import load_dotenv
-from notion_client import Client
+from shared.utils import required_env
+from updater.notion import notion_client
 
-load_dotenv()
-NOTION_TOKEN = os.getenv("INTERNAL_INTEGRATION_TOKEN")
-if not NOTION_TOKEN:
-    raise RuntimeError("Set INTERNAL_INTEGRATION_TOKEN in .env")
-
-notion_client = Client(
-    auth=NOTION_TOKEN,
-    client=httpx.Client(trust_env=False),
-)
+logger = logging.getLogger(__name__)
 
 ASSET_FIELDS = {
     "Name": "name",
@@ -143,14 +134,10 @@ def _parse_page(page, fields):
     return result
 
 
-def fetch_pages(db_id, db_name):
+def fetch_pages(db_id):
     """Return all pages in the given database."""
     response = notion_client.databases.query(database_id=db_id, page_size=100)
-    pages = response.get("results", [])
-
-    if not pages:
-        raise RuntimeError(f"No entries found in the {db_name} database")
-    return pages
+    return response.get("results", [])
 
 
 def _parse_pages(pages, fields):
@@ -211,31 +198,12 @@ def write_snapshot_to_notion(page_id, snapshot):
         )
 
 
-def main():
-    asset_db_id = os.getenv("ASSETS_DATABASE_ID")
-    platform_db_id = os.getenv("PLATFORMS_DATABASE_ID")
-    net_value_db_id = os.getenv("NET_VALUE_DATABASE_ID")
-    growth_log_db_id = os.getenv("GROWTH_LOG_DATABASE_ID")
-    snapshot_page_id = os.getenv("AI_SNAPSHOT_PAGE_ID")
-    if not all(
-        [
-            asset_db_id,
-            platform_db_id,
-            net_value_db_id,
-            growth_log_db_id,
-            snapshot_page_id,
-        ]
-    ):
-        raise RuntimeError(
-            "Set ASSETS_DATABASE_ID, PLATFORMS_DATABASE_ID, "
-            "NET_VALUE_DATABASE_ID, GROWTH_LOG_DATABASE_ID, and "
-            "AI_SNAPSHOT_PAGE_ID in .env"
-        )
-
-    asset_pages = fetch_pages(asset_db_id, "Assets")
-    platform_pages = fetch_pages(platform_db_id, "Platforms")
-    net_value_pages = fetch_pages(net_value_db_id, "Net Value")
-    growth_log_pages = fetch_pages(growth_log_db_id, "Growth Log")
+def generate_snapshot():
+    """Read Dashboard databases and publish their snapshot to Notion."""
+    asset_pages = fetch_pages(required_env("ASSETS_DATABASE_ID"))
+    platform_pages = fetch_pages(required_env("PLATFORMS_DATABASE_ID"))
+    net_value_pages = fetch_pages(required_env("NET_VALUE_DATABASE_ID"))
+    growth_log_pages = fetch_pages(required_env("GROWTH_LOG_DATABASE_ID"))
     snapshot = build_snapshot(
         asset_pages,
         platform_pages,
@@ -243,9 +211,5 @@ def main():
         growth_log_pages,
     )
 
-    write_snapshot_to_notion(snapshot_page_id, snapshot)
-    print("Wrote Dashboard snapshot to Notion")
-
-
-if __name__ == "__main__":
-    main()
+    write_snapshot_to_notion(required_env("AI_SNAPSHOT_PAGE_ID"), snapshot)
+    logger.info("Wrote Dashboard snapshot to Notion")
