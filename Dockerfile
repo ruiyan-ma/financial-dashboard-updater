@@ -1,14 +1,8 @@
-# Build: docker compose up -d --build
-
 FROM python:3.11-slim
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-tracker.txt .
+RUN pip install --no-cache-dir -r requirements-tracker.txt
 COPY . .
 
-CMD ["python", "-m", "tracker.main"]
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 4 --timeout 60 tracker.app:app

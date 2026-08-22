@@ -27,7 +27,7 @@ def required_env(name):
     """Return a required environment variable or raise a clear error."""
     value = os.getenv(name)
     if not value:
-        raise RuntimeError(f"Set {name} in .env")
+        raise RuntimeError(f"Set required environment variable: {name}")
     return value
 
 
@@ -35,3 +35,24 @@ def get_title(properties):
     """Extract the Name title from Notion page properties."""
     title = properties.get("Name", {}).get("title", [])
     return title[0]["plain_text"] if title else None
+
+
+def query_all_pages(notion_client, database_id):
+    """Return all pages from a Notion database query."""
+    pages = []
+    start_cursor = None
+    query = {"database_id": database_id, "page_size": 100}
+
+    while True:
+        if start_cursor:
+            query["start_cursor"] = start_cursor
+
+        response = notion_client.databases.query(**query)
+        pages.extend(response.get("results", []))
+
+        if not response.get("has_more"):
+            return pages
+
+        start_cursor = response.get("next_cursor")
+        if not start_cursor:
+            raise RuntimeError("Notion response has_more but no next_cursor")

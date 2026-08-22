@@ -5,8 +5,9 @@ __pycache__/
 .venv/
 venv/
 
-# Environment files (loaded via docker-compose)
+# Environment files
 .env
+deploy/cloud-run.env
 
 # Logs
 *.log
@@ -26,7 +27,6 @@ venv/
 
 # Docker
 Dockerfile
-docker-compose.yml
 .dockerignore
 
 # OS

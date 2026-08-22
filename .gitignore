@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .venv/
 .env
+deploy/cloud-run.env
 
 # IDE
 .vscode/
@@ -12,9 +13,3 @@ __pycache__/
 
 # OS
 .DS_Store
-
-# Logs
-logs/
-
-# Generated snapshot data
-ibkr_snapshot.json

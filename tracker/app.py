@@ -1,9 +1,12 @@
 """Flask routes for the transaction tracker."""
 
+import hmac
 import logging
 import openai
 from flask import Flask, render_template, jsonify, request
+from werkzeug.exceptions import RequestEntityTooLarge
 from tracker.service import (
+    config,
     get_category_and_account,
     extract_transaction_from_image,
     create_transaction,
@@ -12,28 +15,54 @@ from tracker.transactions import ImageProcessingError, ModelResponseError
 
 logger = logging.getLogger(__name__)
 
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 
 
-def _validate_transaction(data):
-    """Return whether amount and date fields contain valid data."""
+def _validate_transaction(data, accounts):
+    """Return whether required fields are valid and the account is allowed."""
     if not isinstance(data, dict):
         return False
 
     amount = data.get("amount")
+    account = data.get("account")
     date = data.get("date")
 
     return (
         isinstance(amount, (int, float))
         and not isinstance(amount, bool)
+        and account in accounts
         and isinstance(date, str)
         and bool(date)
     )
 
 
+@app.errorhandler(RequestEntityTooLarge)
+def upload_too_large(_error):
+    return jsonify({"success": False, "error": "Image size cannot exceed 10MB"}), 413
+
+
+@app.before_request
+def authenticate_api():
+    """Require a Bearer token for transaction APIs when one is configured."""
+    expected_token = config.tracker_api_token
+    if request.path.startswith("/api/transaction/") and expected_token:
+        scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+        if scheme != "Bearer" or not hmac.compare_digest(token, expected_token):
+            return jsonify({"success": False, "error": "Unauthorized request"}), 401
+    return None
+
+
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", auth_required=bool(config.tracker_api_token))
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
 
 @app.route("/api/transaction/options")
@@ -52,6 +81,7 @@ def transaction_options():
 
     Status Codes:
         200: Success
+        401: Unauthorized request
         500: Server error (database query failed)
     """
     try:
@@ -85,6 +115,8 @@ def transaction_upload():
     Status Codes:
         200: Success
         400: Bad request (no file, empty filename, or invalid image)
+        401: Unauthorized request
+        413: Request body exceeds 10MB
         422: Model response does not contain valid transaction fields
         500: Server error (processing or AI extraction failed)
         502: Upstream model returned an invalid response or API failure
@@ -106,7 +138,8 @@ def transaction_upload():
         extracted_data = extract_transaction_from_image(image_bytes)
 
         # Validate transaction data
-        if not _validate_transaction(extracted_data):
+        valid_accounts = get_category_and_account()["accounts"]
+        if not _validate_transaction(extracted_data, valid_accounts):
             return (
                 jsonify({"success": False, "error": "Invalid transaction data"}),
                 422,
@@ -115,6 +148,8 @@ def transaction_upload():
 
         return jsonify({"success": True, "data": extracted_data})
 
+    except RequestEntityTooLarge:
+        raise
     except ImageProcessingError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except ModelResponseError as e:
@@ -159,12 +194,15 @@ def transaction_confirm():
     Status Codes:
         200: Success
         400: Bad request (invalid transaction data)
+        401: Unauthorized request
+        413: Request body exceeds 10MB
         500: Server error (Notion creation failed)
     """
     try:
         # Get user-confirmed data from request
         data = request.get_json(silent=True)
-        if not _validate_transaction(data):
+        valid_accounts = get_category_and_account()["accounts"]
+        if not _validate_transaction(data, valid_accounts):
             return jsonify({"success": False, "error": "Invalid transaction data"}), 400
         data["amount"] = abs(data["amount"])
 
@@ -173,6 +211,8 @@ def transaction_confirm():
 
         return jsonify({"success": True, "notionUrl": notion_url})
 
+    except RequestEntityTooLarge:
+        raise
     except Exception:
         logger.exception("Failed to create confirmed transaction.")
         return (
@@ -202,6 +242,8 @@ def transaction_shortcut():
     Status Codes:
         200: Success
         400: Bad request (no file, empty filename, or invalid image)
+        401: Unauthorized request
+        413: Request body exceeds 10MB
         422: Model response does not contain valid transaction fields
         500: Server error (image processing or AI extraction failed)
         502: Upstream model returned an invalid response or API failure
@@ -220,7 +262,8 @@ def transaction_shortcut():
         extracted_data = extract_transaction_from_image(image_bytes)
 
         # Validate transaction data
-        if not _validate_transaction(extracted_data):
+        valid_accounts = get_category_and_account()["accounts"]
+        if not _validate_transaction(extracted_data, valid_accounts):
             return (
                 jsonify({"success": False, "error": "Invalid transaction data"}),
                 422,
@@ -250,6 +293,8 @@ def transaction_shortcut():
             200,
         )
 
+    except RequestEntityTooLarge:
+        raise
     except ImageProcessingError as e:
         return jsonify({"success": False, "error": str(e)}), 400
     except ModelResponseError as e:
