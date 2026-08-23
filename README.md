@@ -1,4 +1,4 @@
-# Financial Dashboard Updater
+# Notion Financial Dashboard App
 
 本项目对 Notion Financial Dashboard 提供行情更新和自动记账功能
 
