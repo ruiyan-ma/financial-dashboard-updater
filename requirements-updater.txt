@@ -1,0 +1,5 @@
+yfinance==1.6.0
+curl_cffi==0.16.0
+notion-client==2.2.1
+python-dotenv==1.2.2
+httpx==0.28.1

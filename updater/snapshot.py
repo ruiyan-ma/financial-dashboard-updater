@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from shared.utils import required_env
+from shared.utils import query_all_pages, required_env
 from updater.notion import notion_client
 
 logger = logging.getLogger(__name__)
@@ -134,12 +134,6 @@ def _parse_page(page, fields):
     return result
 
 
-def fetch_pages(db_id):
-    """Return all pages in the given database."""
-    response = notion_client.databases.query(database_id=db_id, page_size=100)
-    return response.get("results", [])
-
-
 def _parse_pages(pages, fields):
     """Parse selected properties from a list of Notion pages."""
     entries = []
@@ -200,10 +194,16 @@ def write_snapshot_to_notion(page_id, snapshot):
 
 def generate_snapshot():
     """Read Dashboard databases and publish their snapshot to Notion."""
-    asset_pages = fetch_pages(required_env("ASSETS_DATABASE_ID"))
-    platform_pages = fetch_pages(required_env("PLATFORMS_DATABASE_ID"))
-    net_value_pages = fetch_pages(required_env("NET_VALUE_DATABASE_ID"))
-    growth_log_pages = fetch_pages(required_env("GROWTH_LOG_DATABASE_ID"))
+    asset_pages = query_all_pages(notion_client, required_env("ASSETS_DATABASE_ID"))
+    platform_pages = query_all_pages(
+        notion_client, required_env("PLATFORMS_DATABASE_ID")
+    )
+    net_value_pages = query_all_pages(
+        notion_client, required_env("NET_VALUE_DATABASE_ID")
+    )
+    growth_log_pages = query_all_pages(
+        notion_client, required_env("GROWTH_LOG_DATABASE_ID")
+    )
     snapshot = build_snapshot(
         asset_pages,
         platform_pages,

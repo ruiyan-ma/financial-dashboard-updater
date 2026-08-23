@@ -1,7 +1,7 @@
 """Environment configuration for the transaction tracker."""
 
+import os
 from dotenv import load_dotenv
-
 from shared.utils import required_env
 
 
@@ -18,4 +18,9 @@ class TrackerConfig:
         self.model_base_url = required_env("MODEL_BASE_URL")
         self.model_name = required_env("MODEL_NAME")
         self.cache_ttl_seconds = int(required_env("CACHE_TTL_SECONDS"))
-        self.port = int(required_env("TRIGGER_PORT"))
+        self.port = int(required_env("PORT"))
+        self.tracker_api_token = None
+
+        # Cloud Run injects K_SERVICE, so API authentication is required only there.
+        if os.getenv("K_SERVICE"):
+            self.tracker_api_token = required_env("TRACKER_API_TOKEN")

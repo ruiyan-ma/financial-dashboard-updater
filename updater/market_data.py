@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import curl_cffi.requests
 import yfinance as yf
 
-from shared.utils import get_title
+from shared.utils import get_title, query_all_pages
 from updater.notion import notion_client
 
 # yfinance handles every market except US stocks and cryptocurrencies.
@@ -38,6 +38,7 @@ class _YFinanceNoiseFilter(logging.Filter):
 
 logging.getLogger("yfinance").setLevel(logging.ERROR)
 logging.getLogger("yfinance").addFilter(_YFinanceNoiseFilter())
+
 
 def _get_market_session():
     """Returns one direct market-data session per worker thread."""
@@ -158,7 +159,7 @@ def run_parallel_update(db_id, process_func, label):
             raise RuntimeError(f"{label} update failed for {name}") from e
 
     try:
-        pages = notion_client.databases.query(database_id=db_id).get("results", [])
+        pages = query_all_pages(notion_client, db_id)
     except Exception as e:
         raise RuntimeError(f"Failed to query {label} database") from e
 

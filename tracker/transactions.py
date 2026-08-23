@@ -5,7 +5,7 @@ import io
 import base64
 import time
 from PIL import Image, UnidentifiedImageError
-from shared.utils import get_title
+from shared.utils import get_title, query_all_pages
 
 MAX_IMAGE_SIZE = 1536
 JPEG_QUALITY = 90
@@ -35,12 +35,13 @@ class TransactionCache:
 
     def get_category_and_account_maps(self, category_db_id, account_db_id):
         """Refreshes the category and account mappings if the cache has expired."""
-        if time.monotonic() - self._cached_at < self.cache_ttl_seconds:
+        if (
+            self._cached_at
+            and time.monotonic() - self._cached_at < self.cache_ttl_seconds
+        ):
             return self._category_map, self._account_map
 
-        results = self.notion_client.databases.query(database_id=category_db_id).get(
-            "results", []
-        )
+        results = query_all_pages(self.notion_client, category_db_id)
         category_map = {}
 
         for page in results:
@@ -55,9 +56,7 @@ class TransactionCache:
             )
             category_map[name] = {"type": category_type, "id": page["id"]}
 
-        results = self.notion_client.databases.query(database_id=account_db_id).get(
-            "results", []
-        )
+        results = query_all_pages(self.notion_client, account_db_id)
         account_map = {}
 
         for page in results:

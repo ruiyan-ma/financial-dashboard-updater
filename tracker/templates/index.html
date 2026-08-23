@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 
-<body id="transaction-view">
+<body id="transaction-view" data-auth-required="{{ 'true' if auth_required else 'false' }}">
     <div class="container">
         <!-- Header -->
         <div class="header compact">
@@ -23,7 +23,6 @@
                 <div class="upload-icon">📤</div>
                 <div class="upload-text">
                     <p class="upload-primary">
-                        <!-- Click or drag to upload transaction screenshot -->
                         Drop screenshots here or click to upload
                     </p>
                     <p class="upload-secondary">Supports JPG and PNG formats</p>
@@ -92,7 +91,7 @@
         <div id="error" class="error hidden">
             <div class="error-icon">⚠️</div>
             <p id="error-message" class="error-message">Processing failed</p>
-            <button id="retry-btn" class="secondary-btn">Retry</button>
+            <button id="retry-btn" class="results-btn">Retry</button>
         </div>
 
     </div>

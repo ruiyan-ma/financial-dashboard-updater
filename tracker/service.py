@@ -24,6 +24,8 @@ openai_client = OpenAI(
     api_key=config.model_api_key,
     base_url=config.model_base_url,
     http_client=httpx.Client(trust_env=False),
+    timeout=50,
+    max_retries=0,
 )
 
 

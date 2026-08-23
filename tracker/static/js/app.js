@@ -4,6 +4,17 @@
  * Handles receipt scanning, data extraction, and Notion entry creation.
  */
 
+function authHeaders(extra = {}) {
+    if (document.body.dataset.authRequired !== "true") return extra;
+
+    let token = sessionStorage.getItem("apiToken");
+    if (!token) {
+        token = window.prompt("Enter Tracker API token:");
+        if (token) sessionStorage.setItem("apiToken", token);
+    }
+    return { ...extra, Authorization: `Bearer ${token || ""}` };
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     if (document.getElementById("transaction-view")) {
         new TransactionController().init();
@@ -29,10 +40,9 @@ class TransactionController {
         // Constants
         this.MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
         this.MESSAGES = {
-            NO_FILE: "Please upload an image file",
             INVALID_TYPE: "Please upload an image file (JPG, PNG)",
             FILE_TOO_LARGE: "Image size cannot exceed 10MB",
-            MISSING_FIELDS: "Please fill in amount and date",
+            MISSING_FIELDS: "Please fill in amount, account, and date",
             NETWORK_ERROR: "Network error, please check connection and retry",
             EXTRACTION_FAILED: "Extraction failed, please retry",
             CREATION_FAILED: "Creation failed, please retry",
@@ -64,8 +74,8 @@ class TransactionController {
 
             // Buttons
             confirmBtn: document.getElementById("confirm-btn"),
-            cancelBtn: document.getElementById("cancel"), // Renamed from uploadAnother
-            backToHomeBtn: document.getElementById("back-to-home"), // Renamed from uploadNew
+            cancelBtn: document.getElementById("cancel"),
+            backToHomeBtn: document.getElementById("back-to-home"),
             retryBtn: document.getElementById("retry-btn"),
         };
 
@@ -85,7 +95,10 @@ class TransactionController {
     /** Fetch Categories and Accounts */
     async fetchOptions() {
         try {
-            const response = await fetch(this.API.OPTIONS);
+            const response = await fetch(this.API.OPTIONS, {
+                headers: authHeaders(),
+            });
+            if (response.status === 401) sessionStorage.removeItem("apiToken");
             const result = await response.json();
             if (result.success) {
                 this.categories = result.categories || [];
@@ -161,8 +174,10 @@ class TransactionController {
 
             const response = await fetch(this.API.UPLOAD, {
                 method: "POST",
+                headers: authHeaders(),
                 body: formData,
             });
+            if (response.status === 401) sessionStorage.removeItem("apiToken");
 
             const result = await response.json();
             if (result.success) {
@@ -186,7 +201,7 @@ class TransactionController {
             date: this.dom.inputDate.value,
         };
 
-        if (!data.amount || !data.date) {
+        if (!data.amount || !data.account || !data.date) {
             this.showError(this.MESSAGES.MISSING_FIELDS);
             return;
         }
@@ -196,9 +211,10 @@ class TransactionController {
         try {
             const response = await fetch(this.API.CONFIRM, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: authHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify(data),
             });
+            if (response.status === 401) sessionStorage.removeItem("apiToken");
 
             const result = await response.json();
             if (result.success) {
@@ -269,7 +285,6 @@ class TransactionController {
         if (this.dom.fileInput) this.dom.fileInput.value = "";
         this.hideAllViews();
         if (this.dom.uploadZone) this.dom.uploadZone.classList.remove("hidden");
-
     }
 
     hideAllViews() {
