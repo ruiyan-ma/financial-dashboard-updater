@@ -34,14 +34,17 @@ def required_env(name):
 def get_title(properties):
     """Extract the Name title from Notion page properties."""
     title = properties.get("Name", {}).get("title", [])
-    return title[0]["plain_text"] if title else None
+    return "".join(item.get("plain_text", "") for item in title) or None
 
 
-def query_all_pages(notion_client, database_id):
+def query_all_pages(notion_client, database_id, filter=None):
     """Return all pages from a Notion database query."""
     pages = []
     start_cursor = None
     query = {"database_id": database_id, "page_size": 100}
+
+    if filter is not None:
+        query["filter"] = filter
 
     while True:
         if start_cursor:

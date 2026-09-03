@@ -10,7 +10,7 @@ from shared.utils import get_title, query_all_pages
 MAX_IMAGE_SIZE = 1536
 JPEG_QUALITY = 90
 MAX_TOKENS = 120
-DEFAULT_ACCOUNT_TYPE = "checking"
+DEFAULT_ACCOUNT_TYPE = "Daily Cash"
 INCOME_ICON = "https://www.notion.so/icons/arrow-down_green.svg"
 EXPENSE_ICON = "https://www.notion.so/icons/arrow-up_red.svg"
 
@@ -51,8 +51,8 @@ class TransactionCache:
                 continue
 
             # Extract category type (Income/Expense) and ID
-            category_type = (
-                props.get("Type", {}).get("select", {}).get("name", "Expense")
+            category_type = ((props.get("Type") or {}).get("select") or {}).get(
+                "name", "Expense"
             )
             category_map[name] = {"type": category_type, "id": page["id"]}
 
@@ -65,9 +65,11 @@ class TransactionCache:
             if not name:
                 continue
 
-            # Filter by account type
-            account_type = props.get("Type", {}).get("select", {}).get("name", "")
-            if account_type.lower() == DEFAULT_ACCOUNT_TYPE.lower():
+            # Filter by "Daily Cash" account type
+            account_type = ((props.get("Type") or {}).get("select") or {}).get(
+                "name", ""
+            )
+            if account_type == DEFAULT_ACCOUNT_TYPE:
                 account_map[name] = page["id"]
 
         self._category_map = category_map

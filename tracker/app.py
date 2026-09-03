@@ -22,21 +22,24 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
 
 
 def _validate_transaction(data, accounts):
-    """Return whether required fields are valid and the account is allowed."""
+    """Validate transaction data and return invalid fields."""
+    invalid_fields = []
+
     if not isinstance(data, dict):
-        return False
+        invalid_fields.append("body")
+    else:
+        amount = data.get("amount")
+        account = data.get("account")
+        date = data.get("date")
 
-    amount = data.get("amount")
-    account = data.get("account")
-    date = data.get("date")
+        if not isinstance(amount, (int, float)) or isinstance(amount, bool):
+            invalid_fields.append("amount")
+        if account not in accounts:
+            invalid_fields.append("account")
+        if not isinstance(date, str) or not date:
+            invalid_fields.append("date")
 
-    return (
-        isinstance(amount, (int, float))
-        and not isinstance(amount, bool)
-        and account in accounts
-        and isinstance(date, str)
-        and bool(date)
-    )
+    return invalid_fields
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -50,7 +53,9 @@ def authenticate_api():
     expected_token = config.tracker_api_token
     if request.path.startswith("/api/transaction/") and expected_token:
         scheme, _, token = request.headers.get("Authorization", "").partition(" ")
-        if scheme != "Bearer" or not hmac.compare_digest(token, expected_token):
+        if scheme != "Bearer" or not hmac.compare_digest(
+            token.encode(), expected_token.encode()
+        ):
             return jsonify({"success": False, "error": "Unauthorized request"}), 401
     return None
 
@@ -139,11 +144,10 @@ def transaction_upload():
 
         # Validate transaction data
         valid_accounts = get_category_and_account()["accounts"]
-        if not _validate_transaction(extracted_data, valid_accounts):
-            return (
-                jsonify({"success": False, "error": "Invalid transaction data"}),
-                422,
-            )
+        invalid_fields = _validate_transaction(extracted_data, valid_accounts)
+        if invalid_fields:
+            message = f"Invalid transaction data: {', '.join(invalid_fields)}"
+            return jsonify({"success": False, "error": message}), 422
         extracted_data["amount"] = abs(extracted_data["amount"])
 
         return jsonify({"success": True, "data": extracted_data})
@@ -202,8 +206,10 @@ def transaction_confirm():
         # Get user-confirmed data from request
         data = request.get_json(silent=True)
         valid_accounts = get_category_and_account()["accounts"]
-        if not _validate_transaction(data, valid_accounts):
-            return jsonify({"success": False, "error": "Invalid transaction data"}), 400
+        invalid_fields = _validate_transaction(data, valid_accounts)
+        if invalid_fields:
+            message = f"Invalid transaction data: {', '.join(invalid_fields)}"
+            return jsonify({"success": False, "error": message}), 400
         data["amount"] = abs(data["amount"])
 
         # Create Notion entry
@@ -263,11 +269,10 @@ def transaction_shortcut():
 
         # Validate transaction data
         valid_accounts = get_category_and_account()["accounts"]
-        if not _validate_transaction(extracted_data, valid_accounts):
-            return (
-                jsonify({"success": False, "error": "Invalid transaction data"}),
-                422,
-            )
+        invalid_fields = _validate_transaction(extracted_data, valid_accounts)
+        if invalid_fields:
+            message = f"Invalid transaction data: {', '.join(invalid_fields)}"
+            return jsonify({"success": False, "error": message}), 422
         extracted_data["amount"] = abs(extracted_data["amount"])
 
         # Create Notion page

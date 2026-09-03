@@ -9,6 +9,8 @@ from updater.notion import notion_client
 
 logger = logging.getLogger(__name__)
 
+_relation_name_cache = {}
+
 ASSET_FIELDS = {
     "Name": "name",
     "Market": "market",
@@ -22,18 +24,23 @@ ASSET_FIELDS = {
 
 HOLDING_FIELDS = {
     "Name": "name",
+    "Asset": "asset",
+    "Platform": "platform",
     "Quantity": "quantity",
     "Average Cost": "average_cost",
     "Current Price": "current_price",
-    "Cost Basis": "total_cost",
+    "Cost Basis": "cost_basis",
     "Market Value": "market_value",
     "P/L": "profit_loss",
+    "Market Value (USD)": "market_value_usd",
+    "P/L (USD)": "profit_loss_usd",
     "P/L (%)": "profit_loss_percent",
     "Total Fees": "total_fees",
 }
 
 PLATFORM_FIELDS = {
     "Name": "name",
+    "Cash Account": "cash_account",
     "Currency": "currency",
     "Market Value": "market_value",
     "Cash Balance": "cash_balance",
@@ -41,21 +48,28 @@ PLATFORM_FIELDS = {
     "Deposit Amount": "deposit_amount",
     "P/L": "profit_loss",
     "P/L (%)": "profit_loss_percent",
-    "Holdings": "holdings",
+}
+
+PROPERTY_FIELDS = {
+    "Name": "name",
+    "Type": "type",
+    "Quantity": "quantity",
+    "Value (USD)": "market_value_usd",
+    "P/L (%)": "profit_loss_percent",
+}
+
+ACCOUNT_FIELDS = {
+    "Name": "name",
+    "Type": "type",
+    "Currency": "currency",
+    "Balance": "balance",
+    "Balance (USD)": "balance_usd",
 }
 
 NET_VALUE_FIELDS = {
     "Name": "name",
     "Type": "type",
-    "Net Value (USD)": "net_value_usd",
-}
-
-GROWTH_LOG_FIELDS = {
-    "Name": "name",
-    "Date": "date",
-    "Begin": "begin",
-    "End": "end",
-    "Growth": "growth",
+    "Net Value (USD)": "value",
 }
 
 
@@ -68,7 +82,7 @@ def _parse_prop_value(prop_val, relation_name=None):
     """Parse a Notion property value into a simple JSON value.
 
     relation_name identifies the originating Relation property. It must be preserved
-    through nested calls so Relation parsing can select the correct behavior.
+    through nested calls.
     """
     type_val = prop_val.get("type")
     if type_val is None:
@@ -99,27 +113,25 @@ def _parse_prop_value(prop_val, relation_name=None):
 
 
 def _parse_relation(relations, relation_name):
-    """Parse a relation according to its Relation property name."""
+    """Parse a Relation property into its related page's Name property."""
     if relation_name is None:
         raise ValueError("Relation property name is required.")
 
-    if relation_name == "Currency":
-        if len(relations) != 1:
-            raise ValueError("Currency relation must have exactly one related page.")
-        page = notion_client.pages.retrieve(page_id=relations[0]["id"])
-        return _parse_prop_value(page["properties"]["Name"])
+    if not relations:
+        raise ValueError(f"Relation {relation_name!r} has no related page.")
 
-    if relation_name == "Holdings":
-        holdings = [
-            _parse_page(
-                notion_client.pages.retrieve(page_id=relation["id"]),
-                HOLDING_FIELDS,
+    if len(relations) == 1:
+        page_id = relations[0]["id"]
+        if page_id not in _relation_name_cache:
+            page = notion_client.pages.retrieve(page_id=page_id)
+            _relation_name_cache[page_id] = _parse_prop_value(
+                page["properties"]["Name"]
             )
-            for relation in relations
-        ]
-        return [holding for holding in holdings if holding["quantity"] != 0]
+        return _relation_name_cache[page_id]
 
-    raise NotImplementedError(f"Relation property {relation_name!r} is not supported")
+    raise NotImplementedError(
+        f"Multiple related pages are not supported for relation {relation_name!r}."
+    )
 
 
 def _parse_page(page, fields):
@@ -137,31 +149,51 @@ def _parse_page(page, fields):
 def _parse_pages(pages, fields):
     """Parse selected properties from a list of Notion pages."""
     entries = []
-
     for page in pages:
-        entry = {"page_id": page["id"], "url": page.get("url")}
+        entry = {"page_id": page["id"]}
         entry.update(_parse_page(page, fields))
         entries.append(entry)
     return entries
 
 
-def build_snapshot(asset_pages, platform_pages, net_value_pages, growth_log_pages):
+def build_snapshot(
+    asset_pages,
+    holding_pages,
+    platform_pages,
+    property_pages,
+    account_pages,
+    net_value_pages,
+):
     """Build the stable JSON snapshot for Dashboard pages."""
+    _relation_name_cache.clear()
+
     assets = _parse_pages(asset_pages, ASSET_FIELDS)
-    assets = [asset for asset in assets if asset["market_value_usd"] != 0]
-
+    holdings = _parse_pages(holding_pages, HOLDING_FIELDS)
     platforms = _parse_pages(platform_pages, PLATFORM_FIELDS)
-    platforms = [platform for platform in platforms if platform["total_value"] != 0]
-
-    net_values = _parse_pages(net_value_pages, NET_VALUE_FIELDS)
-    growth_log = _parse_pages(growth_log_pages, GROWTH_LOG_FIELDS)
+    properties = _parse_pages(property_pages, PROPERTY_FIELDS)
+    accounts = _parse_pages(account_pages, ACCOUNT_FIELDS)
+    domain_values = _parse_pages(net_value_pages, NET_VALUE_FIELDS)
 
     return {
+        "schema_version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "conventions": {
+            "holding_currency": "Holdings inherit currency from their related Assets.",
+            "transaction_currency": (
+                "Transactions inherit currency from their related Holdings."
+            ),
+            "usd_fields": "Monetary fields ending in _usd are always in USD.",
+        },
         "assets": assets,
+        "holdings": holdings,
         "platforms": platforms,
-        "net_values": net_values,
-        "growth_log": growth_log,
+        "properties": properties,
+        "accounts": accounts,
+        "summary": {
+            "reporting_currency": "USD",
+            "net_worth": sum(domain["value"] for domain in domain_values),
+            "by_domain": domain_values,
+        },
     }
 
 
@@ -194,21 +226,51 @@ def write_snapshot_to_notion(page_id, snapshot):
 
 def generate_snapshot():
     """Read Dashboard databases and publish their snapshot to Notion."""
-    asset_pages = query_all_pages(notion_client, required_env("ASSETS_DATABASE_ID"))
-    platform_pages = query_all_pages(
-        notion_client, required_env("PLATFORMS_DATABASE_ID")
+    asset_pages = query_all_pages(
+        notion_client,
+        required_env("ASSETS_DATABASE_ID"),
+        filter={
+            "property": "Market Value (USD)",
+            "formula": {"number": {"does_not_equal": 0}},
+        },
     )
+
+    holding_pages = query_all_pages(
+        notion_client,
+        required_env("HOLDINGS_DATABASE_ID"),
+        filter={
+            "property": "Quantity",
+            "formula": {"number": {"does_not_equal": 0}},
+        },
+    )
+
+    platform_pages = query_all_pages(
+        notion_client,
+        required_env("PLATFORMS_DATABASE_ID"),
+        filter={
+            "property": "Total Value",
+            "formula": {"number": {"does_not_equal": 0}},
+        },
+    )
+
+    property_pages = query_all_pages(
+        notion_client,
+        required_env("PROPERTIES_DATABASE_ID"),
+    )
+
+    account_pages = query_all_pages(notion_client, required_env("ACCOUNTS_DATABASE_ID"))
+
     net_value_pages = query_all_pages(
         notion_client, required_env("NET_VALUE_DATABASE_ID")
     )
-    growth_log_pages = query_all_pages(
-        notion_client, required_env("GROWTH_LOG_DATABASE_ID")
-    )
+
     snapshot = build_snapshot(
         asset_pages,
+        holding_pages,
         platform_pages,
+        property_pages,
+        account_pages,
         net_value_pages,
-        growth_log_pages,
     )
 
     write_snapshot_to_notion(required_env("AI_SNAPSHOT_PAGE_ID"), snapshot)
